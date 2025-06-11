@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset TymofiiSkrypko:create-videos-table
+--changeset TymofiiSkrypko:upload-create-videos-table context:upload-service
 CREATE TABLE videos
 (
     id                  UUID PRIMARY KEY,
@@ -19,7 +19,7 @@ CREATE TABLE videos
     modified_by         VARCHAR(255) NOT NULL
 );
 
---changeset TymofiiSkrypko:create-videos-indexes
+--changeset TymofiiSkrypko:upload-create-videos-indexes context:upload-service
 CREATE INDEX idx_videos_user_id ON videos(user_id);
 CREATE INDEX idx_videos_status ON videos(status);
 CREATE INDEX idx_videos_uploaded_at ON videos(uploaded_at);

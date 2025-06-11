@@ -1,10 +1,11 @@
 server:
-  port: 8082
+  port: 8083
 
 spring:
   application:
-    name: upload-service
+    name: metadata-service
   
+  # Shared database with upload service
   datasource:
     url: jdbc:postgresql://localhost:5433/video_platform
     username: ${DB_USERNAME:upload_user}
@@ -24,14 +25,20 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     enabled: true
-    contexts: upload-service
+    contexts: metadata-service  # IMPORTANT: Context separation for shared DB
   
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 2GB
-      max-request-size: 2GB
-      file-size-threshold: 2KB
+  # Redis configuration (same instance as upload service)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
   
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -40,34 +47,40 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
     virtual-host: ${RABBITMQ_VHOST:/}
 
-# AWS S3 Configuration
-aws:
-  access:
-    key: ${AWS_ACCESS_KEY:your-access-key}
-  secret:
-    key: ${AWS_SECRET_KEY:your-secret-key}
-  region: ${AWS_REGION:us-east-1}
-  s3:
-    bucket:
-      name: ${S3_BUCKET_NAME:video-hosting-platform-bucket}
-      prefix: ${S3_BUCKET_PREFIX:videos/}
-
 # RabbitMQ Configuration
 rabbitmq:
   exchange:
     video: ${RABBITMQ_EXCHANGE:video.exchange}
   queue:
-    encoding: ${RABBITMQ_QUEUE_ENCODING:video.encoding.queue}
+    metadata: ${RABBITMQ_QUEUE_METADATA:video.metadata.queue}
+    search: ${RABBITMQ_QUEUE_SEARCH:video.search.queue}
   routing:
     key:
-      encoding: ${RABBITMQ_ROUTING_KEY_ENCODING:video.encoding}
+      metadata: ${RABBITMQ_ROUTING_KEY_METADATA:video.metadata}
+      search-refresh: ${RABBITMQ_ROUTING_KEY_SEARCH:video.search.refresh}
+
+# Cache configuration
+cache:
+  video-metadata:
+    ttl: 3600  # 1 hour
+  search-results:
+    ttl: 600   # 10 minutes
+  categories:
+    ttl: 7200  # 2 hours
+
+# Search configuration
+search:
+  default-page-size: 20
+  max-page-size: 100
+  default-sort: relevance
+  materialized-view-refresh-interval: 300  # 5 minutes
 
 # Management endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when_authorized
@@ -75,10 +88,10 @@ management:
 # Logging configuration
 logging:
   level:
-    com.tskrypko.upload: INFO
+    com.tskrypko.metadata: INFO
     org.springframework.web: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/upload-service.log 
+    name: logs/metadata-service.log 
