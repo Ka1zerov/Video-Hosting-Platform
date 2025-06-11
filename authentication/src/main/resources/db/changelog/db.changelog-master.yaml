@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - include:
+      file: changes/v1.0-userauth-changelog.sql
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/v2.0-oauth2-oidc-support.sql
+      relativeToChangelogFile: true

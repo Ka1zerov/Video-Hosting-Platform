@@ -1,0 +1,49 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+
+  datasource:
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    url: jdbc:tc:postgresql:14:///test
+    username: test
+    password: test
+
+  config:
+    activate:
+      on-profile: test
+    import: optional:application-test.yaml
+
+  servlet:
+    multipart:
+      max-file-size: 1048576
+      max-request-size: 1048576
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    label-filter: "!exclude-test"
+
+  mail:
+    username: "testMailUsername@mail.com"
+
+aws:
+  s3:
+    access:
+      key: "test-key"
+    secret:
+      key: "test-key"
+    region: "test-region"
+    bucket: "test-bucket"
+
+frontend:
+  base_url: "http://localhost:3000"
+
+google:
+  client-id: "GOOGLE_OAUTH2_CLIENT_ID"
+  client-secret: "GOOGLE_OAUTH2_CLIENT_SECRET"

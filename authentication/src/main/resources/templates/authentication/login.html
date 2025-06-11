@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="EN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Gym App</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/authentication/main.css">
+</head>
+<body th:data-frontend-url="${frontendUrl}">
+
+<div th:if="${errorType == 'not_verified'}" id="verification-error-toast" class="error-toast verification-error">
+    <div class="error-toast-content">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>Verify your account via email link before logging in</span>
+        <button class="close-error" onclick="dismissError('verification-error-toast')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
+<div th:if="${errorType == 'invalid'}" id="credentials-error-toast" class="error-toast credentials-error">
+    <div class="error-toast-content">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>Invalid email or password. Please try again.</span>
+        <button class="close-error" onclick="dismissError('credentials-error-toast')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
+<div class="login-container">
+    <div class="app-logo">Gym App</div>
+    <h1 class="title">Sign in</h1>
+    <form th:action="@{/login}" method="post" class="login-form">
+        <div class="form-group">
+            <label for="username">Email</label>
+            <input type="email" id="username" name="username" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <div class="password-wrapper">
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                <span class="toggle-password" onclick="togglePasswordVisibility()">
+                    <i class="fas fa-eye"></i>
+                </span>
+            </div>
+        </div>
+        <div class="forgot-password-container">
+            <p><a href="#" onclick="redirectToForgotPassword()">Forgot password?</a></p>
+        </div>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <button type="submit" class="submit-button">Login</button>
+    </form>
+
+    <div class="separator">
+        <span>OR</span>
+    </div>
+
+    <div class="google-login-button" onclick="window.location.href='/oauth2/authorization/google'">
+        <i class="fab fa-google"></i>
+        Sign in with Google
+    </div>
+
+    <div class="register-container">
+        <p>Don't have an account? <a href="#" onclick="redirectToRegister()">Register here!</a></p>
+    </div>
+    <div class="copyright">
+        <p>© Sourcery Graduates 2025</p>
+    </div>
+</div>
+<script src="/authentication/scripts.js"></script>
+</body>
+</html>

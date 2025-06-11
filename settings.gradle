@@ -1,0 +1,3 @@
+rootProject.name = 'Video-Hosting-Platform'
+
+include("authentication", "upload", "streaming", "encoding", "metadata", "gateway")
