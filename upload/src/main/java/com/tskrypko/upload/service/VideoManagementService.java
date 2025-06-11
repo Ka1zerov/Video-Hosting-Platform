@@ -3,9 +3,9 @@ package com.tskrypko.upload.service;
 import com.tskrypko.upload.model.Video;
 import com.tskrypko.upload.model.VideoStatus;
 import com.tskrypko.upload.repository.VideoRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,12 +14,12 @@ import java.util.UUID;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class VideoManagementService {
 
     private static final Logger logger = LoggerFactory.getLogger(VideoManagementService.class);
 
-    @Autowired
-    private VideoRepository videoRepository;
+    private final VideoRepository videoRepository;
 
     public boolean restoreVideo(UUID videoId, String userId) {
         Optional<Video> videoOpt = videoRepository.findByIdAndUserIdIncludingDeleted(videoId, userId);

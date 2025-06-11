@@ -7,9 +7,9 @@ import com.tskrypko.upload.service.CurrentUserService;
 import com.tskrypko.upload.service.VideoUploadService;
 import com.tskrypko.upload.service.VideoManagementService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,18 +23,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/upload")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class UploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(UploadController.class);
 
-    @Autowired
-    private VideoUploadService videoUploadService;
-
-    @Autowired
-    private VideoManagementService videoManagementService;
-
-    @Autowired
-    private CurrentUserService currentUserService;
+    private final VideoUploadService videoUploadService;
+    private final VideoManagementService videoManagementService;
+    private final CurrentUserService currentUserService;
 
     @PostMapping(value = "/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UploadResponse> uploadVideo(

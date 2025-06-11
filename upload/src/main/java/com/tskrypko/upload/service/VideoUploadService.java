@@ -5,9 +5,9 @@ import com.tskrypko.upload.dto.UploadResponse;
 import com.tskrypko.upload.model.Video;
 import com.tskrypko.upload.model.VideoStatus;
 import com.tskrypko.upload.repository.VideoRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,6 +19,7 @@ import java.util.UUID;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class VideoUploadService {
 
     private static final Logger logger = LoggerFactory.getLogger(VideoUploadService.class);
@@ -30,14 +31,9 @@ public class VideoUploadService {
 
     private static final long MAX_FILE_SIZE = 2L * 1024 * 1024 * 1024;
 
-    @Autowired
-    private VideoRepository videoRepository;
-
-    @Autowired
-    private S3Service s3Service;
-
-    @Autowired
-    private MessagePublisher messagePublisher;
+    private final VideoRepository videoRepository;
+    private final S3Service s3Service;
+    private final MessagePublisher messagePublisher;
 
     public UploadResponse uploadVideo(MultipartFile file, UploadRequest request, String userId) {
 

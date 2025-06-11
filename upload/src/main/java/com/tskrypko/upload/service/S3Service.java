@@ -3,9 +3,9 @@ package com.tskrypko.upload.service;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,12 +15,12 @@ import java.io.InputStream;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class S3Service {
 
     private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
 
-    @Autowired
-    private AmazonS3 amazonS3;
+    private final AmazonS3 amazonS3;
 
     @Value("${aws.s3.bucket.name}")
     private String bucketName;
@@ -28,9 +28,6 @@ public class S3Service {
     @Value("${aws.s3.bucket.prefix:videos/}")
     private String keyPrefix;
 
-    /**
-     * Загружает файл в S3 и возвращает ключ объекта
-     */
     public String uploadFile(MultipartFile file, String userId) throws IOException {
         String originalFilename = file.getOriginalFilename();
         String fileExtension = getFileExtension(originalFilename);
@@ -62,9 +59,6 @@ public class S3Service {
         }
     }
 
-    /**
-     * Удаляет файл из S3
-     */
     public void deleteFile(String s3Key) {
         try {
             amazonS3.deleteObject(bucketName, s3Key);
@@ -75,9 +69,6 @@ public class S3Service {
         }
     }
 
-    /**
-     * Проверяет существование файла в S3
-     */
     public boolean fileExists(String s3Key) {
         try {
             return amazonS3.doesObjectExist(bucketName, s3Key);
@@ -87,18 +78,12 @@ public class S3Service {
         }
     }
 
-    /**
-     * Генерирует уникальный ключ для файла
-     */
     private String generateUniqueKey(String userId, String fileExtension) {
         String timestamp = String.valueOf(System.currentTimeMillis());
         String uuid = UUID.randomUUID().toString();
         return String.format("%s%s/%s_%s%s", keyPrefix, userId, timestamp, uuid, fileExtension);
     }
 
-    /**
-     * Извлекает расширение файла
-     */
     private String getFileExtension(String filename) {
         if (filename == null || !filename.contains(".")) {
             return "";
@@ -106,10 +91,7 @@ public class S3Service {
         return filename.substring(filename.lastIndexOf("."));
     }
 
-    /**
-     * Возвращает URL файла в S3
-     */
     public String getFileUrl(String s3Key) {
         return amazonS3.getUrl(bucketName, s3Key).toString();
     }
-} 
+}

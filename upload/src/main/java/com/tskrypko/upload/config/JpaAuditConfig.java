@@ -1,7 +1,7 @@
 package com.tskrypko.upload.config;
 
 import com.tskrypko.upload.service.CurrentUserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
@@ -11,10 +11,10 @@ import java.util.Optional;
 
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
+@RequiredArgsConstructor
 public class JpaAuditConfig {
 
-    @Autowired
-    private CurrentUserService currentUserService;
+    private final CurrentUserService currentUserService;
 
     @Bean
     public AuditorAware<String> auditorProvider() {
