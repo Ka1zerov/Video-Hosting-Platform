@@ -27,11 +27,11 @@ spring:
     enabled: true
     contexts: metadata-service  # IMPORTANT: Context separation for shared DB
   
-  # Redis configuration (same instance as upload service)
+  # Updated Redis configuration for shared infrastructure
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6380}
+      port: ${REDIS_PORT:6379}  # Changed from 6380 to 6379 (shared Redis)
       password: ${REDIS_PASSWORD:}
       timeout: 5000ms
       lettuce:

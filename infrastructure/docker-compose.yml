@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Authentication Service Database
+  postgres-auth:
+    image: postgres:14
+    container_name: platform-postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+      - ./config/postgres/auth-init:/docker-entrypoint-initdb.d
+    networks:
+      - platform-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles: ["auth", "full"]
+
+  # Video Platform Database (Upload + Metadata services)
+  postgres-video:
+    image: postgres:15
+    container_name: platform-postgres-video
+    environment:
+      POSTGRES_DB: video_platform
+      POSTGRES_USER: upload_user
+      POSTGRES_PASSWORD: upload_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_video_data:/var/lib/postgresql/data
+      - ./config/postgres/video-init:/docker-entrypoint-initdb.d
+    networks:
+      - platform-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upload_user -d video_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles: ["video", "full"]
+
+  # Shared Redis (Video services: Upload, Metadata, Streaming)
+  redis:
+    image: redis:7-alpine
+    container_name: platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - platform-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles: ["video", "full"]
+
+  # RabbitMQ (Message broker for all services)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: platform-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - platform-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    profiles: ["video", "full"]
+
+  # =========================
+  # ADMIN TOOLS (OPTIONAL)
+  # =========================
+
+  # pgAdmin for Auth database
+  pgadmin-auth:
+    image: dpage/pgadmin4:latest
+    container_name: platform-pgadmin-auth
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@auth.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_auth_data:/var/lib/pgadmin
+    networks:
+      - platform-network
+    depends_on:
+      - postgres-auth
+    restart: unless-stopped
+    profiles: ["admin", "admin-auth"]
+
+  # pgAdmin for Video database
+  pgadmin-video:
+    image: dpage/pgadmin4:latest
+    container_name: platform-pgadmin-video
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@video.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5051:80"
+    volumes:
+      - pgadmin_video_data:/var/lib/pgadmin
+    networks:
+      - platform-network
+    depends_on:
+      - postgres-video
+    restart: unless-stopped
+    profiles: ["admin", "admin-video"]
+
+  # Redis Commander
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: platform-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - platform-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles: ["admin", "admin-video"]
+
+networks:
+  platform-network:
+    driver: bridge
+    name: platform-network
+    external: false
+
+volumes:
+  postgres_auth_data:
+    name: platform_postgres_auth_data
+  postgres_video_data:
+    name: platform_postgres_video_data
+  redis_data:
+    name: platform_redis_data
+  rabbitmq_data:
+    name: platform_rabbitmq_data
+  pgadmin_auth_data:
+    name: platform_pgadmin_auth_data
+  pgadmin_video_data:
+    name: platform_pgadmin_video_data 

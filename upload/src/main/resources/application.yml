@@ -33,6 +33,19 @@ spring:
       max-request-size: 2GB
       file-size-threshold: 2KB
   
+  # Updated Redis configuration for shared infrastructure
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}  # Changed from 6380 to 6379 (shared Redis)
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+  
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
