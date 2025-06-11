@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Master PostgreSQL
+  postgres-master:
+    image: postgres:15
+    container_name: upload-postgres-master
+    environment:
+      POSTGRES_DB: video_platform
+      POSTGRES_USER: upload_user
+      POSTGRES_PASSWORD: upload_pass
+      POSTGRES_REPLICATION_USER: replica_user
+      POSTGRES_REPLICATION_PASSWORD: replica_pass
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with auth service (5432)
+    volumes:
+      - postgres_master_data:/var/lib/postgresql/data
+      - ./docker/postgres/master/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/master/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - upload-replica-network
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hba_file=/etc/postgresql/pg_hba.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upload_user -d video_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Slave PostgreSQL (Read Replica)
+  postgres-slave:
+    image: postgres:15
+    container_name: upload-postgres-slave
+    environment:
+      POSTGRES_DB: video_platform
+      POSTGRES_USER: upload_user
+      POSTGRES_PASSWORD: upload_pass
+      POSTGRES_MASTER_SERVICE: postgres-master
+      POSTGRES_REPLICATION_USER: replica_user
+      POSTGRES_REPLICATION_PASSWORD: replica_pass
+    ports:
+      - "5434:5432"  # Slave direct access port
+    volumes:
+      - postgres_slave_data:/var/lib/postgresql/data
+      - ./docker/postgres/slave/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/slave/recovery.conf:/var/lib/postgresql/data/recovery.conf
+    networks:
+      - upload-replica-network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+    command: >
+      bash -c "
+      if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+        echo 'Setting up replica...'
+        pg_basebackup -h postgres-master -D /var/lib/postgresql/data -U replica_user -v -P -W
+        echo 'standby_mode = on' >> /var/lib/postgresql/data/recovery.conf
+        echo 'primary_conninfo = ''host=postgres-master port=5432 user=replica_user password=replica_pass''' >> /var/lib/postgresql/data/recovery.conf
+      fi
+      postgres -c config_file=/etc/postgresql/postgresql.conf
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upload_user -d video_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis (unchanged from single instance setup)
+  redis:
+    image: redis:7-alpine
+    container_name: upload-service-redis
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_upload_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - upload-replica-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # HAProxy for load balancing
+  haproxy:
+    image: haproxy:latest
+    container_name: upload-haproxy
+    ports:
+      - "5435:5432"  # Main port for application (write operations)
+      - "5436:5435"  # Read operations port
+      - "8404:8404"  # HAProxy statistics
+    volumes:
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    networks:
+      - upload-replica-network
+    depends_on:
+      - postgres-master
+      - postgres-slave
+    restart: unless-stopped
+
+networks:
+  upload-replica-network:
+    driver: bridge
+    name: upload-replica-network
+
+volumes:
+  postgres_master_data:
+    name: upload_postgres_master_data
+  postgres_slave_data:
+    name: upload_postgres_slave_data
+  redis_upload_data:
+    name: upload_redis_data 

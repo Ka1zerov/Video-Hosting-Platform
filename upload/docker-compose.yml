@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: upload-service-postgres
+    environment:
+      POSTGRES_DB: video_platform
+      POSTGRES_USER: upload_user
+      POSTGRES_PASSWORD: upload_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with auth service (5432)
+    volumes:
+      - postgres_upload_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - upload-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upload_user -d video_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: upload-service-redis
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_upload_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - upload-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: upload-service-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@upload.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5051:80"  # Different port to avoid conflicts
+    volumes:
+      - pgadmin_upload_data:/var/lib/pgadmin
+    networks:
+      - upload-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - admin  # Only starts with --profile admin
+
+  # Optional: Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: upload-service-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8085:8081"  # Changed port to avoid conflict with upload service (8082)
+    networks:
+      - upload-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles:
+      - admin
+
+networks:
+  upload-network:
+    driver: bridge
+    name: upload-network
+
+volumes:
+  postgres_upload_data:
+    name: upload_postgres_data
+  redis_upload_data:
+    name: upload_redis_data
+  pgadmin_upload_data:
+    name: upload_pgadmin_data 

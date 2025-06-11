@@ -13,6 +13,8 @@ Upload Service is part of the Video Hosting Platform and handles video file uplo
 - **Database migrations** via Liquibase
 - **Automatic audit** for created/modified fields
 - **Soft delete** for data recovery (files still deleted from S3)
+- **Redis caching** for performance optimization
+- **Database replication** support for high availability
 
 ## Database Schema
 
@@ -87,6 +89,181 @@ Note: Permanently removes video metadata from database. Video must be soft-delet
 GET /api/upload/health
 ```
 
+## Docker Development Setup
+
+### Single Instance (Development)
+
+```bash
+# Start PostgreSQL and Redis
+./scripts/docker-dev.sh start
+
+# Start with admin tools (pgAdmin, Redis Commander)
+./scripts/docker-dev.sh start-admin
+
+# View logs
+./scripts/docker-dev.sh logs
+
+# Stop services
+./scripts/docker-dev.sh stop
+
+# Clean up (removes all data!)
+./scripts/docker-dev.sh clean
+```
+
+**Services:**
+- **PostgreSQL**: `localhost:5433` (auth service uses 5432)
+- **Redis**: `localhost:6380`
+- **pgAdmin**: `http://localhost:5051` (admin/admin)
+- **Redis Commander**: `http://localhost:8085` (upload service uses 8082)
+
+### Database Replication Setup
+
+```bash
+# Start Master-Slave PostgreSQL replication
+docker-compose -f docker-compose-replica.yml up -d
+
+# Check replication status
+docker-compose -f docker-compose-replica.yml exec postgres-master \
+  psql -U upload_user -d video_platform -c "SELECT * FROM pg_stat_replication;"
+
+# Stop replication setup
+docker-compose -f docker-compose-replica.yml down
+```
+
+**Replication Services:**
+- **Write Operations**: `localhost:5435` (via HAProxy → Master)
+- **Read Operations**: `localhost:5436` (via HAProxy → Master + Slave)
+- **Master Direct**: `localhost:5433`
+- **Slave Direct**: `localhost:5434`
+- **HAProxy Stats**: `http://localhost:8404`
+
+**Port Allocation Summary:**
+```
+Auth Service:     localhost:8081
+Upload Service:   localhost:8082
+Streaming Service: localhost:8083
+Gateway:          localhost:8080
+
+Auth PostgreSQL:  localhost:5432
+Upload PostgreSQL: localhost:5433
+Upload PostgreSQL Master: localhost:5433
+Upload PostgreSQL Slave:  localhost:5434
+Upload HAProxy Write:     localhost:5435
+Upload HAProxy Read:      localhost:5436
+
+Upload Redis:     localhost:6380
+pgAdmin:          localhost:5051
+Redis Commander:  localhost:8085
+HAProxy Stats:    localhost:8404
+```
+
+## Database Replication Analysis
+
+### 🔄 **Types of PostgreSQL Replication**
+
+#### **1. Streaming Replication (Hot Standby)**
+```
+Master ----WAL Stream----> Slave
+```
+
+**Плюсы:**
+- ✅ Простота настройки и управления
+- ✅ Минимальная задержка репликации (< 1s)
+- ✅ Автоматическое восстановление после сбоев
+- ✅ Возможность чтения с replica
+- ✅ Встроенная поддержка в PostgreSQL
+
+**Минусы:**
+- ❌ Асинхронная репликация (возможна потеря данных)
+- ❌ Single point of failure (master)
+- ❌ Ручное переключение на slave при сбое master
+
+#### **2. Synchronous Replication**
+```yaml
+# В postgresql.conf master
+synchronous_standby_names = 'slave1'
+synchronous_commit = on
+```
+
+**Плюсы:**
+- ✅ Гарантированная консистентность данных
+- ✅ Нет потери данных при сбое master
+
+**Минусы:**
+- ❌ Значительно медленнее (ждет подтверждения от slave)
+- ❌ При недоступности slave блокируются записи
+
+#### **3. Logical Replication**
+```sql
+-- На master
+CREATE PUBLICATION video_pub FOR TABLE videos;
+
+-- На slave  
+CREATE SUBSCRIPTION video_sub 
+CONNECTION 'host=master port=5432 user=replica_user dbname=video_platform' 
+PUBLICATION video_pub;
+```
+
+**Плюсы:**
+- ✅ Селективная репликация (только нужные таблицы)
+- ✅ Возможность фильтрации данных
+- ✅ Репликация между разными версиями PostgreSQL
+- ✅ Bi-directional replication
+
+**Минусы:**
+- ❌ Больше нагрузки на master
+- ❌ Сложнее настройка и мониторинг
+
+### ⚖️ **Сравнение подходов для Upload Service**
+
+| Критерий | Streaming | Synchronous | Logical |
+|----------|-----------|-------------|---------|
+| **Простота** | 🟢 High | 🟡 Medium | 🔴 Low |
+| **Производительность** | 🟢 High | 🔴 Low | 🟡 Medium |
+| **Консистентность** | 🟡 Eventual | 🟢 Strong | 🟡 Eventual |
+| **Failover** | 🟡 Manual | 🟡 Manual | 🔴 Complex |
+| **Ресурсы** | 🟢 Low | 🟡 Medium | 🔴 High |
+
+### 🎯 **Рекомендация для Upload Service**
+
+**Для разработки/тестирования:**
+```bash
+./scripts/docker-dev.sh start  # Простая схема
+```
+
+**Для продакшена:**
+```bash
+docker-compose -f docker-compose-replica.yml up -d  # Streaming replication
+```
+
+### 📊 **Мониторинг репликации**
+
+```sql
+-- Проверка статуса репликации на master
+SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn 
+FROM pg_stat_replication;
+
+-- Проверка задержки репликации на slave
+SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) AS lag_seconds;
+
+-- Размер WAL файлов
+SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)) AS lag_size
+FROM pg_stat_replication;
+```
+
+### 🛠️ **Управление репликацией**
+
+```bash
+# Promote slave to master (при сбое master)
+docker-compose -f docker-compose-replica.yml exec postgres-slave \
+  su - postgres -c "pg_ctl promote -D /var/lib/postgresql/data"
+
+# Rebuild slave после failover
+docker-compose -f docker-compose-replica.yml stop postgres-slave
+docker volume rm upload_postgres_slave_data
+docker-compose -f docker-compose-replica.yml up -d postgres-slave
+```
+
 ## Soft Delete Behavior
 
 - **Soft Delete**: `DELETE /api/upload/video/{videoId}`
@@ -109,8 +286,8 @@ GET /api/upload/health
 ### Environment Variables
 
 #### Database
-- `DB_USERNAME` - PostgreSQL username (default: postgres)
-- `DB_PASSWORD` - PostgreSQL password (default: postgres)
+- `DB_USERNAME` - PostgreSQL username (default: upload_user)
+- `DB_PASSWORD` - PostgreSQL password (default: upload_pass)
 
 #### AWS S3
 - `AWS_ACCESS_KEY` - AWS access key
@@ -118,6 +295,11 @@ GET /api/upload/health
 - `AWS_REGION` - AWS region (default: us-east-1)
 - `S3_BUCKET_NAME` - S3 bucket name
 - `S3_BUCKET_PREFIX` - file prefix (default: videos/)
+
+#### Redis
+- `REDIS_HOST` - Redis host (default: localhost)
+- `REDIS_PORT` - Redis port (default: 6380)
+- `REDIS_PASSWORD` - Redis password (optional)
 
 #### RabbitMQ
 - `RABBITMQ_HOST` - RabbitMQ host (default: localhost)
@@ -148,9 +330,10 @@ GET /api/upload/health
 Upload Service integrates with:
 
 1. **Amazon S3** - for video file storage
-2. **PostgreSQL** - for metadata storage
-3. **RabbitMQ** - for sending messages to Encoding Service
-4. **Gateway** - for user authentication via X-User-Id header
+2. **PostgreSQL** - for metadata storage (with optional replication)
+3. **Redis** - for caching and session storage
+4. **RabbitMQ** - for sending messages to Encoding Service
+5. **Gateway** - for user authentication via X-User-Id header
 
 ## JPA Configuration
 
@@ -162,25 +345,26 @@ Current JPA settings provide:
 
 ## Running
 
+### Development (Local)
 ```bash
-# Build project
-./gradlew build
+# Start infrastructure
+./scripts/docker-dev.sh start
 
-# Run application
+# Build and run application
 ./gradlew bootRun
 ```
 
-Service will be available on port 8082.
-
-## Docker
-
+### Production (with Replication)
 ```bash
-# Build Docker image
-docker build -t upload-service .
+# Start infrastructure with replication
+docker-compose -f docker-compose-replica.yml up -d
 
-# Run container
-docker run -p 8082:8082 upload-service
+# Build and run application
+./gradlew build
+java -jar build/libs/upload-0.0.1-SNAPSHOT.jar
 ```
+
+Service will be available on port 8082.
 
 ## Database Migrations
 
