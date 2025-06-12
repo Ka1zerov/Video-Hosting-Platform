@@ -48,7 +48,31 @@ services:
     restart: unless-stopped
     profiles: ["video", "full"]
 
-  # Shared Redis (Video services: Upload, Metadata, Streaming)
+  # Encoding Service Database
+  postgres-encoding:
+    image: postgres:15
+    container_name: platform-postgres-encoding
+    environment:
+      POSTGRES_DB: encoding_db
+      POSTGRES_USER: encoding_user
+      POSTGRES_PASSWORD: encoding_pass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_encoding_data:/var/lib/postgresql/data
+      - ./config/postgres/encoding-init:/docker-entrypoint-initdb.d
+    networks:
+      - platform-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U encoding_user -d encoding_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles: ["encoding", "video", "full"]
+
+  # Shared Redis (Video services: Upload, Metadata, Streaming, Encoding)
   redis:
     image: redis:7-alpine
     container_name: platform-redis
@@ -132,6 +156,25 @@ services:
     restart: unless-stopped
     profiles: ["admin", "admin-video"]
 
+  # pgAdmin for Encoding database
+  pgadmin-encoding:
+    image: dpage/pgadmin4:latest
+    container_name: platform-pgadmin-encoding
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@encoding.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5052:80"
+    volumes:
+      - pgadmin_encoding_data:/var/lib/pgadmin
+    networks:
+      - platform-network
+    depends_on:
+      - postgres-encoding
+    restart: unless-stopped
+    profiles: ["admin", "admin-encoding"]
+
   # Redis Commander
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -158,6 +201,8 @@ volumes:
     name: platform_postgres_auth_data
   postgres_video_data:
     name: platform_postgres_video_data
+  postgres_encoding_data:
+    name: platform_postgres_encoding_data
   redis_data:
     name: platform_redis_data
   rabbitmq_data:
@@ -165,4 +210,6 @@ volumes:
   pgadmin_auth_data:
     name: platform_pgadmin_auth_data
   pgadmin_video_data:
-    name: platform_pgadmin_video_data 
+    name: platform_pgadmin_video_data
+  pgadmin_encoding_data:
+    name: platform_pgadmin_encoding_data 

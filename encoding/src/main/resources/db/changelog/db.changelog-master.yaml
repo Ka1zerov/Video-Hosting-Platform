@@ -1,0 +1,4 @@
+databaseChangeLog:
+  - include:
+      file: classpath:db/changelog/changes/v1.0-encoding-job-table.sql
+      context: encoding-service 
