@@ -5,19 +5,15 @@ import com.tskrypko.encoding.model.EncodingStatus;
 import com.tskrypko.encoding.model.VideoQuality;
 import com.tskrypko.encoding.repository.EncodingJobRepository;
 import lombok.RequiredArgsConstructor;
-import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
-import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.job.FFmpegJob;
-import net.bramp.ffmpeg.progress.Progress;
-import net.bramp.ffmpeg.progress.ProgressListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +31,7 @@ public class VideoEncodingService {
     private final EncodingJobRepository encodingJobRepository;
     private final S3Service s3Service;
     private final FFmpegService ffmpegService;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${encoding.temp.directory:/tmp/encoding}")
     private String tempDirectory;
@@ -44,7 +40,6 @@ public class VideoEncodingService {
     private int hlsSegmentDuration;
 
     @Async
-    @Transactional
     public void processEncodingJob(String jobId) {
         try {
             EncodingJob job = encodingJobRepository.findById(java.util.UUID.fromString(jobId))
@@ -55,10 +50,11 @@ public class VideoEncodingService {
             updateJobStatus(job, EncodingStatus.PROCESSING, LocalDateTime.now(), null);
 
             String localInputFile = downloadVideoFromS3(job);
-            
+            long videoDurationNs = getVideoDurationNs(localInputFile);
+
             // Process each quality
             for (VideoQuality quality : VideoQuality.values()) {
-                processQuality(job, localInputFile, quality);
+                processQuality(job, localInputFile, quality, videoDurationNs);
             }
 
             // Generate thumbnails
@@ -75,7 +71,7 @@ public class VideoEncodingService {
         }
     }
 
-    private void processQuality(EncodingJob job, String inputFile, VideoQuality quality) throws IOException {
+    private void processQuality(EncodingJob job, String inputFile, VideoQuality quality, long videoDurationNs) throws IOException {
         logger.info("Encoding {} quality for job {}", quality.getLabel(), job.getId());
 
         String outputDir = createOutputDirectory(job, quality);
@@ -87,7 +83,7 @@ public class VideoEncodingService {
                 .setVideoCodec("libx264")
                 .setVideoFrameRate(24)
                 .setVideoResolution(quality.getWidth(), quality.getHeight())
-                .setVideoBitRate(quality.getBitrateKbps() * 1000)
+                .setVideoBitRate(quality.getBitrateKbps() * 1000L)
                 .setAudioCodec("aac")
                 .setAudioBitRate(128_000)
                 .setFormat("hls")
@@ -96,13 +92,16 @@ public class VideoEncodingService {
                 .addExtraArgs("-hls_segment_filename", Paths.get(outputDir, "segment_%03d.ts").toString())
                 .done();
 
-        FFmpegExecutor executor = new FFmpegExecutor(ffmpegService.getFFmpeg(), ffmpegService.getFFprobe());
+        FFmpegExecutor executor = new FFmpegExecutor(ffmpegService.getFfmpeg(), ffmpegService.getFfprobe());
 
-        FFmpegJob ffmpegJob = executor.createJob(builder, new ProgressListener() {
-            @Override
-            public void progress(Progress progress) {
-                double percentage = progress.out_time_ns / (double) progress.total_time_ns * 100;
-                updateJobProgress(job, (int) percentage);
+        FFmpegJob ffmpegJob = executor.createJob(builder, progress -> {
+            if (videoDurationNs > 0) {
+                int percent = (int) Math.min(100, Math.max(0, (progress.out_time_ns * 100 / videoDurationNs)));
+                transactionTemplate.execute(status -> {
+                    job.setProgress(percent);
+                    encodingJobRepository.save(job);
+                    return null;
+                });
             }
         });
 
@@ -123,12 +122,12 @@ public class VideoEncodingService {
             FFmpegBuilder builder = new FFmpegBuilder()
                     .setInput(inputFile)
                     .addOutput(thumbnailFile)
-                    .setVideoFrames(1)
                     .setVideoFilter("scale=" + quality.getWidth() + ":" + quality.getHeight())
                     .addExtraArgs("-ss", "00:00:10")
+                    .addExtraArgs("-vframes", "1")
                     .done();
 
-            FFmpegExecutor executor = new FFmpegExecutor(ffmpegService.getFFmpeg(), ffmpegService.getFFprobe());
+            FFmpegExecutor executor = new FFmpegExecutor(ffmpegService.getFfmpeg(), ffmpegService.getFfprobe());
             executor.createJob(builder).run();
         }
 
@@ -139,10 +138,10 @@ public class VideoEncodingService {
     private String downloadVideoFromS3(EncodingJob job) throws IOException {
         String tempDir = createTempDirectory(job);
         String localFile = Paths.get(tempDir, "input_" + job.getOriginalFilename()).toString();
-        
+
         s3Service.downloadFile(job.getS3Key(), localFile);
         logger.info("Downloaded video from S3: {} -> {}", job.getS3Key(), localFile);
-        
+
         return localFile;
     }
 
@@ -166,10 +165,10 @@ public class VideoEncodingService {
 
     private void uploadQualityToS3(EncodingJob job, String outputDir, VideoQuality quality) throws IOException {
         String s3Prefix = "encoded/" + job.getVideoId() + "/" + quality.getFolder() + "/";
-        
+
         File dir = new File(outputDir);
         File[] files = dir.listFiles();
-        
+
         if (files != null) {
             for (File file : files) {
                 String s3Key = s3Prefix + file.getName();
@@ -181,10 +180,10 @@ public class VideoEncodingService {
 
     private void uploadThumbnailsToS3(EncodingJob job, String thumbnailDir) throws IOException {
         String s3Prefix = "thumbnails/" + job.getVideoId() + "/";
-        
+
         File dir = new File(thumbnailDir);
         File[] files = dir.listFiles();
-        
+
         if (files != null) {
             for (File file : files) {
                 String s3Key = s3Prefix + file.getName();
@@ -195,54 +194,64 @@ public class VideoEncodingService {
     }
 
     private void cleanupTempFiles(EncodingJob job) {
-        try {
-            Path tempPath = Paths.get(tempDirectory, job.getId().toString());
-            if (Files.exists(tempPath)) {
-                Files.walk(tempPath)
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-                Files.delete(tempPath);
-                logger.info("Cleaned up temp files for job: {}", job.getId());
+        Path tempPath = Paths.get(tempDirectory, job.getId().toString());
+        if (Files.exists(tempPath)) {
+            try (var walk = Files.walk(tempPath)) {
+                walk.map(Path::toFile).forEach(File::delete);
+            } catch (IOException e) {
+                logger.warn("Failed to cleanup temp files for job {}: {}", job.getId(), e.getMessage());
             }
-        } catch (IOException e) {
-            logger.warn("Failed to cleanup temp files for job {}: {}", job.getId(), e.getMessage());
+            try {
+                Files.deleteIfExists(tempPath);
+                logger.info("Cleaned up temp files for job: {}", job.getId());
+            } catch (IOException e) {
+                logger.warn("Failed to delete temp directory for job {}: {}", job.getId(), e.getMessage());
+            }
         }
     }
 
-    @Transactional
     protected void updateJobStatus(EncodingJob job, EncodingStatus status, LocalDateTime startedAt, LocalDateTime completedAt) {
-        job.setStatus(status);
-        if (startedAt != null) {
-            job.setStartedAt(startedAt);
-        }
-        if (completedAt != null) {
-            job.setCompletedAt(completedAt);
-        }
-        encodingJobRepository.save(job);
+        transactionTemplate.execute(tx -> {
+            job.setStatus(status);
+            if (startedAt != null) {
+                job.setStartedAt(startedAt);
+            }
+            if (completedAt != null) {
+                job.setCompletedAt(completedAt);
+            }
+            encodingJobRepository.save(job);
+            return null;
+        });
     }
 
-    @Transactional
-    protected void updateJobProgress(EncodingJob job, int progress) {
-        job.setProgress(Math.min(100, Math.max(0, progress)));
-        encodingJobRepository.save(job);
-    }
-
-    @Transactional
     protected void handleJobError(String jobId, String errorMessage) {
         try {
             EncodingJob job = encodingJobRepository.findById(java.util.UUID.fromString(jobId))
                     .orElse(null);
-            
+
             if (job != null) {
-                job.setStatus(EncodingStatus.FAILED);
-                job.setErrorMessage(errorMessage);
-                job.setRetryCount(job.getRetryCount() + 1);
-                encodingJobRepository.save(job);
-                
+                transactionTemplate.execute(tx -> {
+                    job.setStatus(EncodingStatus.FAILED);
+                    job.setErrorMessage(errorMessage);
+                    job.setRetryCount(job.getRetryCount() + 1);
+                    encodingJobRepository.save(job);
+                    return null;
+                });
                 cleanupTempFiles(job);
             }
         } catch (Exception e) {
             logger.error("Error handling job error for {}: {}", jobId, e.getMessage(), e);
         }
     }
-} 
+
+    private long getVideoDurationNs(String inputFile) {
+        try {
+            var probeResult = ffmpegService.getFfprobe().probe(inputFile);
+            double seconds = probeResult.getFormat().duration;
+            return (long) (seconds * 1_000_000_000L);
+        } catch (Exception e) {
+            logger.warn("Could not get video duration for {}: {}", inputFile, e.getMessage());
+            return 0;
+        }
+    }
+}

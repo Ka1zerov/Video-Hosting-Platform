@@ -34,10 +34,10 @@ public class MultipartUploadService {
 
     // Minimum part size - 5 MB (except for the last part)
     private static final long MIN_PART_SIZE = 5 * 1024 * 1024;
-    
+
     // Maximum number of parts in S3 multipart upload
     private static final int MAX_PARTS = 10000;
-    
+
     // TTL for sessions in Redis (24 hours)
     private static final long SESSION_TTL_HOURS = 24;
 
@@ -74,13 +74,13 @@ public class MultipartUploadService {
 
         // Initialize multipart upload in S3
         InitiateMultipartUploadRequest s3Request = new InitiateMultipartUploadRequest(bucketName, s3Key);
-        
+
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(request.getMimeType());
         metadata.addUserMetadata("original-filename", request.getOriginalFilename());
         metadata.addUserMetadata("user-id", userId);
         metadata.addUserMetadata("title", request.getTitle());
-        
+
         s3Request.setObjectMetadata(metadata);
 
         InitiateMultipartUploadResult s3Result = amazonS3.initiateMultipartUpload(s3Request);
@@ -135,7 +135,7 @@ public class MultipartUploadService {
 
         // Validate part number
         if (partNumber < 1 || partNumber > session.getTotalParts()) {
-            throw new IllegalArgumentException("Invalid part number: " + partNumber + 
+            throw new IllegalArgumentException("Invalid part number: " + partNumber +
                     ". Valid range: 1-" + session.getTotalParts());
         }
 
@@ -159,8 +159,8 @@ public class MultipartUploadService {
             session.addUploadedPart(partNumber, etag);
             saveSessionToRedis(uploadId, session);
 
-            logger.info("Chunk uploaded successfully: uploadId={}, partNumber={}, etag={}, progress={:.2f}%",
-                    uploadId, partNumber, etag, session.getProgressPercentage());
+            logger.info("Chunk uploaded successfully: uploadId={}, partNumber={}, etag={}, progress={}",
+                    uploadId, partNumber, etag, String.format("%.2f%%", session.getProgressPercentage()));
 
             return new ChunkUploadResponse(
                     etag,
@@ -192,7 +192,7 @@ public class MultipartUploadService {
 
         // Check that all parts are uploaded
         if (!session.isCompleted()) {
-            throw new IllegalArgumentException("Not all parts uploaded. Progress: " + 
+            throw new IllegalArgumentException("Not all parts uploaded. Progress: " +
                     session.getUploadedPartsCount() + "/" + session.getTotalParts());
         }
 
@@ -245,7 +245,7 @@ public class MultipartUploadService {
         } catch (Exception e) {
             logger.error("Error completing multipart upload: uploadId={}, error={}",
                     uploadId, e.getMessage(), e);
-            
+
             // In case of error, try to abort multipart upload
             try {
                 abortMultipartUpload(uploadId);
@@ -253,7 +253,7 @@ public class MultipartUploadService {
                 logger.error("Failed to abort multipart upload after completion error: {}",
                         abortEx.getMessage(), abortEx);
             }
-            
+
             throw new RuntimeException("Failed to complete multipart upload", e);
         }
     }
@@ -310,10 +310,10 @@ public class MultipartUploadService {
 
     private void validateChunkSize(MultipartFile chunk, Integer partNumber, MultipartUploadSession session) {
         long chunkSize = chunk.getSize();
-        
+
         // All parts except the last one must be at least 5MB
         if (partNumber < session.getTotalParts() && chunkSize < MIN_PART_SIZE) {
-            throw new IllegalArgumentException("Part size too small. Minimum: " + 
+            throw new IllegalArgumentException("Part size too small. Minimum: " +
                     (MIN_PART_SIZE / 1024 / 1024) + " MB");
         }
 
@@ -328,7 +328,7 @@ public class MultipartUploadService {
         }
 
         if (chunkSize > expectedSize + 1024) { // Allow small tolerance
-            throw new IllegalArgumentException("Part size too large. Expected: " + expectedSize + 
+            throw new IllegalArgumentException("Part size too large. Expected: " + expectedSize +
                     ", got: " + chunkSize);
         }
     }
@@ -336,10 +336,10 @@ public class MultipartUploadService {
     private long calculateOptimalPartSize(long fileSize) {
         // Calculate optimal part size
         long partSize = Math.max(MIN_PART_SIZE, fileSize / MAX_PARTS);
-        
+
         // Round to nearest MB
         partSize = ((partSize + 1024 * 1024 - 1) / (1024 * 1024)) * 1024 * 1024;
-        
+
         return partSize;
     }
 
@@ -384,11 +384,11 @@ public class MultipartUploadService {
         try {
             String key = "multipart:upload:" + uploadId;
             String sessionJson = redisTemplate.opsForValue().get(key);
-            
+
             if (sessionJson == null) {
                 return null;
             }
-            
+
             return objectMapper.readValue(sessionJson, MultipartUploadSession.class);
         } catch (JsonProcessingException e) {
             logger.error("Error reading session from Redis: {}", e.getMessage(), e);
@@ -400,4 +400,4 @@ public class MultipartUploadService {
         String key = "multipart:upload:" + uploadId;
         redisTemplate.delete(key);
     }
-} 
+}

@@ -12,8 +12,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Service
 @RequiredArgsConstructor
 public class VideoMessageListener {
@@ -31,7 +29,7 @@ public class VideoMessageListener {
 
         try {
             JsonNode messageNode = objectMapper.readTree(message);
-            
+
             String videoId = messageNode.get("videoId").asText();
             String userId = messageNode.get("userId").asText();
             String title = messageNode.get("title").asText();
@@ -60,7 +58,7 @@ public class VideoMessageListener {
         }
     }
 
-    private EncodingJob createEncodingJob(String videoId, String userId, String title, 
+    private EncodingJob createEncodingJob(String videoId, String userId, String title,
                                         String originalFilename, String s3Key, Long fileSize, String mimeType) {
         EncodingJob job = new EncodingJob();
         job.setVideoId(videoId);
@@ -73,7 +71,7 @@ public class VideoMessageListener {
         job.setStatus(EncodingStatus.PENDING);
         job.setRetryCount(0);
         job.setProgress(0);
-        
+
         return job;
     }
-} 
+}

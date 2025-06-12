@@ -27,19 +27,19 @@ public class FFmpegService {
     private FFprobe ffprobe;
 
     @PostConstruct
-    public void init() throws IOException {
+    public void init() {
         logger.info("Initializing FFmpeg service with paths: ffmpeg={}, ffprobe={}", ffmpegPath, ffprobePath);
-        
+
         try {
             this.ffmpeg = new FFmpeg(ffmpegPath);
             this.ffprobe = new FFprobe(ffprobePath);
-            
+
             logger.info("FFmpeg version: {}", ffmpeg.version());
             logger.info("FFprobe version: {}", ffprobe.version());
-            
+
         } catch (IOException e) {
             logger.error("Failed to initialize FFmpeg: {}", e.getMessage(), e);
             throw new RuntimeException("FFmpeg initialization failed", e);
         }
     }
-} 
+}
