@@ -35,56 +35,27 @@ public class UploadController {
     @PostMapping(value = "/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UploadResponse> uploadVideo(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("title") String title,
-            @RequestParam(value = "description", required = false) String description) {
-
-        try {
-            String userId = currentUserService.getCurrentUserId();
-            
-            UploadRequest request = new UploadRequest(title, description);
-            UploadResponse response = videoUploadService.uploadVideo(file, request, userId);
-            
-            logger.info("Video successfully uploaded by user {}: {}", userId, title);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (IllegalArgumentException e) {
-            logger.warn("Invalid video upload request: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(new UploadResponse(null, null, null, null, null, null, null, 
-                                           "Validation error: " + e.getMessage()));
-        } catch (Exception e) {
-            logger.error("Error uploading video: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new UploadResponse(null, null, null, null, null, null, null, 
-                                           "Internal server error"));
-        }
-    }
-
-    @PostMapping(value = "/video-with-metadata", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<UploadResponse> uploadVideoWithMetadata(
-            @RequestParam("file") MultipartFile file,
             @Valid @ModelAttribute UploadRequest request) {
 
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             UploadResponse response = videoUploadService.uploadVideo(file, request, userId);
-            
-            logger.info("Video with metadata successfully uploaded by user {}: {}", 
+
+            logger.info("Video with metadata successfully uploaded by user {}: {}",
                        userId, request.getTitle());
-            
+
             return ResponseEntity.ok(response);
-            
+
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid video upload request: {}", e.getMessage());
             return ResponseEntity.badRequest()
-                    .body(new UploadResponse(null, null, null, null, null, null, null, 
+                    .body(new UploadResponse(null, null, null, null, null, null, null,
                                            "Validation error: " + e.getMessage()));
         } catch (Exception e) {
             logger.error("Error uploading video: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new UploadResponse(null, null, null, null, null, null, null, 
+                    .body(new UploadResponse(null, null, null, null, null, null, null,
                                            "Internal server error"));
         }
     }
@@ -93,15 +64,11 @@ public class UploadController {
     public ResponseEntity<Video> getVideo(@PathVariable UUID videoId) {
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             Optional<Video> video = videoUploadService.getVideo(videoId, userId);
-            
-            if (video.isPresent()) {
-                return ResponseEntity.ok(video.get());
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-            
+
+            return video.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+
         } catch (Exception e) {
             logger.error("Error getting video ID={}: {}", videoId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -112,11 +79,11 @@ public class UploadController {
     public ResponseEntity<List<Video>> getUserVideos() {
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             List<Video> videos = videoUploadService.getUserVideos(userId);
-            
+
             return ResponseEntity.ok(videos);
-            
+
         } catch (Exception e) {
             logger.error("Error getting user videos: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -127,15 +94,15 @@ public class UploadController {
     public ResponseEntity<String> deleteVideo(@PathVariable UUID videoId) {
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             boolean deleted = videoUploadService.deleteVideo(videoId, userId);
-            
+
             if (deleted) {
                 return ResponseEntity.ok("Video successfully deleted");
             } else {
                 return ResponseEntity.notFound().build();
             }
-            
+
         } catch (Exception e) {
             logger.error("Error deleting video ID={}: {}", videoId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -147,16 +114,16 @@ public class UploadController {
     public ResponseEntity<String> restoreVideo(@PathVariable UUID videoId) {
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             boolean restored = videoManagementService.restoreVideo(videoId, userId);
-            
+
             if (restored) {
                 return ResponseEntity.ok("Video successfully restored");
             } else {
                 return ResponseEntity.badRequest()
                         .body("Video cannot be restored (not found or not deleted)");
             }
-            
+
         } catch (Exception e) {
             logger.error("Error restoring video ID={}: {}", videoId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -168,16 +135,16 @@ public class UploadController {
     public ResponseEntity<String> permanentlyDeleteVideo(@PathVariable UUID videoId) {
         try {
             String userId = currentUserService.getCurrentUserId();
-            
+
             boolean deleted = videoManagementService.permanentlyDeleteVideo(videoId, userId);
-            
+
             if (deleted) {
                 return ResponseEntity.ok("Video permanently deleted");
             } else {
                 return ResponseEntity.badRequest()
                         .body("Video cannot be permanently deleted (not found or not soft deleted)");
             }
-            
+
         } catch (Exception e) {
             logger.error("Error permanently deleting video ID={}: {}", videoId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
@@ -18,7 +19,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class VideoUploadService {
 
@@ -34,6 +34,7 @@ public class VideoUploadService {
     private final VideoRepository videoRepository;
     private final S3Service s3Service;
     private final MessagePublisher messagePublisher;
+    private final TransactionTemplate transactionTemplate;
 
     public UploadResponse uploadVideo(MultipartFile file, UploadRequest request, String userId) {
 
@@ -41,26 +42,50 @@ public class VideoUploadService {
 
         validateVideoFile(file);
 
+        String s3Key = null;
         try {
-            String s3Key = s3Service.uploadFile(file, userId);
+            s3Key = s3Service.uploadFile(file, userId);
+            logger.info("File uploaded to S3: {}", s3Key);
+
             Video video = createVideoRecord(file, request, userId, s3Key);
-            Video savedVideo = videoRepository.save(video);
-            sendEncodingMessage(savedVideo);
+            Video savedVideo = transactionTemplate.execute(status -> {
+                Video saved = videoRepository.save(video);
+                logger.info("Video record saved to database: ID={}", saved.getId());
+                return saved;
+            });
+
+            try {
+                sendEncodingMessage(savedVideo);
+                logger.info("Video upload message sent to queue: videoId={}", savedVideo.getId());
+            } catch (Exception e) {
+                logger.error("Error sending message to queue (non-critical): {}", e.getMessage(), e);
+            }
 
             logger.info("Video successfully uploaded: ID={}, S3Key={}", savedVideo.getId(), s3Key);
-
             return createUploadResponse(savedVideo);
 
         } catch (Exception e) {
             logger.error("Error uploading video: {}", e.getMessage(), e);
+
+            if (s3Key != null) {
+                try {
+                    s3Service.deleteFile(s3Key);
+                    logger.info("S3 file cleaned up after error: {}", s3Key);
+                } catch (Exception cleanupEx) {
+                    logger.error("Failed to cleanup S3 file: {}", s3Key, cleanupEx);
+                }
+            }
+
             throw new RuntimeException("Failed to upload video: " + e.getMessage(), e);
         }
     }
 
+    @Transactional(readOnly = true)
     public Optional<Video> getVideo(UUID videoId, String userId) {
         return videoRepository.findByIdAndUserId(videoId, userId);
     }
 
+    @Transactional(readOnly = true)
     public List<Video> getUserVideos(String userId) {
         return videoRepository.findByUserIdOrderByUploadedAtDesc(userId);
     }
@@ -135,12 +160,7 @@ public class VideoUploadService {
     }
 
     private void sendEncodingMessage(Video video) {
-        try {
-            messagePublisher.publishVideoUploadedMessage(video);
-            logger.info("Video upload message sent to queue: videoId={}", video.getId());
-        } catch (Exception e) {
-            logger.error("Error sending message to queue: {}", e.getMessage(), e);
-        }
+        messagePublisher.publishVideoUploadedMessage(video);
     }
 
     private UploadResponse createUploadResponse(Video video) {

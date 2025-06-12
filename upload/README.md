@@ -15,6 +15,57 @@ Upload Service is part of the Video Hosting Platform and handles video file uplo
 - **Soft delete** for data recovery (files still deleted from S3)
 - **Redis caching** for performance optimization
 - **Database replication** support for high availability
+- **Multipart Upload** for large video files with chunked uploading
+
+## 🧩 Multipart Upload Support
+
+Support for multipart upload of large video files using S3 chunked uploading.
+
+### ✅ **Why Multipart Upload?**
+
+For video hosting platforms, multipart upload is **essential** because:
+
+- 🔄 **Resumable uploads** - continue interrupted uploads
+- ⚡ **Parallel chunks** - upload multiple parts simultaneously  
+- 🛡️ **Reliability** - only failed parts need to be retried
+- 🚀 **Performance** - faster for large files (>100MB)
+- 💾 **Memory efficient** - no need to load entire file in memory
+
+### 📊 **Technical Details**
+
+- **Minimum file size**: 5 MB (S3 requirement)
+- **Optimal chunk size**: 5-10 MB per part
+- **Maximum parts**: 10,000 per upload
+- **Session storage**: Redis with 24h TTL
+- **Progress tracking**: Real-time upload progress
+- **Error handling**: Automatic cleanup on failures
+
+### 🔗 **API Endpoints**
+
+```http
+POST   /api/upload/multipart/initiate     # Start multipart upload
+POST   /api/upload/multipart/upload-chunk # Upload single chunk
+POST   /api/upload/multipart/complete/{id} # Complete upload
+DELETE /api/upload/multipart/abort/{id}   # Cancel upload
+GET    /api/upload/multipart/status/{id}  # Check progress
+```
+
+### 🏗️ **Architecture Enhancement**
+
+```
+Frontend ──► MultipartController ──► MultipartService ──► S3
+    │              │                      │               │
+    │              │                      └─► Redis ──────┘
+    │              │                      │
+    │              │                      └─► PostgreSQL ──► RabbitMQ
+    │              │
+    └─── Progress ←┘
+```
+
+### 📚 **Documentation**
+
+For detailed multipart upload usage, examples, and integration guide, see:
+**[MULTIPART_UPLOAD.md](MULTIPART_UPLOAD.md)**
 
 ## Database Schema
 
@@ -38,6 +89,15 @@ Database migrations are managed by Liquibase. The main entities:
 - **deleted_at** (TIMESTAMP) - Soft delete timestamp (null = not deleted)
 
 ## API Endpoints
+
+### 📋 **Upload Method Selection:**
+
+```
+Client
+├── Small files (<5MB) ──► POST /api/upload/video (only option)
+├── Medium files (5-100MB) ──► Any method
+└── Large files (>100MB) ──► POST /api/upload/multipart/* (recommended)
+```
 
 ### Upload video
 ```http
@@ -298,7 +358,7 @@ docker-compose -f docker-compose-replica.yml up -d postgres-slave
 
 #### Redis
 - `REDIS_HOST` - Redis host (default: localhost)
-- `REDIS_PORT` - Redis port (default: 6380)
+- `REDIS_PORT` - Redis port (default: 6379)
 - `REDIS_PASSWORD` - Redis password (optional)
 
 #### RabbitMQ
