@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Video Hosting Platform - Quick Infrastructure Management
+# Wrapper script for infrastructure/scripts/platform.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLATFORM_SCRIPT="$SCRIPT_DIR/infrastructure/scripts/platform.sh"
+
+# Check if the platform script exists
+if [ ! -f "$PLATFORM_SCRIPT" ]; then
+    echo "❌ Error: Platform script not found at $PLATFORM_SCRIPT"
+    exit 1
+fi
+
+# Pass all arguments to the platform script
+exec "$PLATFORM_SCRIPT" "$@" 

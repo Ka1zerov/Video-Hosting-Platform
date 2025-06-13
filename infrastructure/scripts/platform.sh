@@ -12,7 +12,7 @@ cd "$INFRA_DIR"
 show_help() {
     echo "🎥 Video Hosting Platform Infrastructure"
     echo ""
-    echo "Usage: $0 {command} [profile]"
+    echo "Usage: ./platform {command} [profile]"
     echo ""
     echo "Commands:"
     echo "  start [profile]    - Start infrastructure services"
@@ -46,31 +46,31 @@ show_help() {
     echo "  Redis Commander:    http://localhost:8081"
     echo ""
     echo "Examples:"
-    echo "  $0 start auth              # Start only auth database"
-    echo "  $0 start video             # Start video services"
-    echo "  $0 start full              # Start all services"
-    echo "  $0 start admin             # Start all + admin tools"
-    echo "  $0 logs postgres-video     # Show video database logs"
-    echo "  $0 backup-video           # Backup video database"
+    echo "  ./platform start auth              # Start only auth database"
+    echo "  ./platform start video             # Start video services"
+    echo "  ./platform start full              # Start all services"
+    echo "  ./platform start admin             # Start all + admin tools"
+    echo "  ./platform logs postgres-video     # Show video database logs"
+    echo "  ./platform backup-video           # Backup video database"
 }
 
 case "$1" in
     "start")
         profile=${2:-"full"}
         echo "🚀 Starting platform infrastructure (profile: $profile)..."
-        
+
         if [ "$profile" = "admin" ]; then
-            docker-compose --profile full --profile admin up -d
+            docker compose --profile full --profile admin up -d
             echo "✅ All services with admin tools started!"
             echo "🎛️  pgAdmin Auth: http://localhost:5050 (admin@auth.local / admin)"
             echo "🎛️  pgAdmin Video: http://localhost:5051 (admin@video.local / admin)"
             echo "🎮 Redis Commander: http://localhost:8081"
             echo "🐰 RabbitMQ UI: http://localhost:15672 (guest / guest)"
         else
-            docker-compose --profile "$profile" up -d
+            docker compose --profile "$profile" up -d
             echo "✅ Infrastructure started (profile: $profile)!"
         fi
-        
+
         echo ""
         echo "📊 Services:"
         if [ "$profile" = "auth" ] || [ "$profile" = "full" ]; then
@@ -83,35 +83,35 @@ case "$1" in
             echo "  RabbitMQ UI: http://localhost:15672"
         fi
         ;;
-    
+
     "stop")
         echo "🛑 Stopping platform infrastructure..."
-        docker-compose --profile full --profile admin down
+        docker compose --profile full --profile admin down
         echo "✅ All services stopped!"
         ;;
-    
+
     "restart")
         profile=${2:-"full"}
         echo "🔄 Restarting platform infrastructure (profile: $profile)..."
-        docker-compose --profile "$profile" down
-        docker-compose --profile "$profile" up -d
+        docker compose --profile "$profile" down
+        docker compose --profile "$profile" up -d
         echo "✅ Services restarted!"
         ;;
-    
+
     "logs")
         service=${2:-""}
         if [ -z "$service" ]; then
-            docker-compose logs -f
+            docker compose logs -f
         else
-            docker-compose logs -f "$service"
+            docker compose logs -f "$service"
         fi
         ;;
-    
+
     "status")
         echo "📋 Platform infrastructure status:"
-        docker-compose ps
+        docker compose ps
         ;;
-    
+
     "clean")
         echo "🧹 Cleaning up platform infrastructure..."
         echo "⚠️  This will delete ALL data including:"
@@ -123,68 +123,68 @@ case "$1" in
         read -p "Are you sure? (y/N): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            docker-compose --profile full --profile admin down -v
-            docker-compose rm -f
+            docker compose --profile full --profile admin down -v
+            docker compose rm -f
             docker volume rm platform_postgres_auth_data platform_postgres_video_data platform_redis_data platform_rabbitmq_data platform_pgadmin_auth_data platform_pgadmin_video_data 2>/dev/null || true
             echo "✅ Cleanup complete!"
         else
             echo "❌ Cleanup cancelled."
         fi
         ;;
-    
+
     "backup-auth")
         echo "💾 Creating auth database backup..."
         timestamp=$(date +%Y%m%d_%H%M%S)
         backup_file="auth_backup_${timestamp}.sql"
-        docker-compose exec postgres-auth pg_dump -U app_user auth_db > "$backup_file"
+        docker compose exec postgres-auth pg_dump -U app_user auth_db > "$backup_file"
         echo "✅ Auth backup created: $backup_file"
         ;;
-    
+
     "backup-video")
         echo "💾 Creating video database backup..."
         timestamp=$(date +%Y%m%d_%H%M%S)
         backup_file="video_backup_${timestamp}.sql"
-        docker-compose exec postgres-video pg_dump -U upload_user video_platform > "$backup_file"
+        docker compose exec postgres-video pg_dump -U upload_user video_platform > "$backup_file"
         echo "✅ Video backup created: $backup_file"
         ;;
-    
+
     "restore-auth")
         if [ -z "$2" ]; then
-            echo "❌ Please specify backup file: $0 restore-auth backup_file.sql"
+            echo "❌ Please specify backup file: ./platform restore-auth backup_file.sql"
             exit 1
         fi
         echo "📥 Restoring auth database from $2..."
-        docker-compose exec -T postgres-auth psql -U app_user auth_db < "$2"
+        docker compose exec -T postgres-auth psql -U app_user auth_db < "$2"
         echo "✅ Auth database restored!"
         ;;
-    
+
     "restore-video")
         if [ -z "$2" ]; then
-            echo "❌ Please specify backup file: $0 restore-video backup_file.sql"
+            echo "❌ Please specify backup file: ./platform restore-video backup_file.sql"
             exit 1
         fi
         echo "📥 Restoring video database from $2..."
-        docker-compose exec -T postgres-video psql -U upload_user video_platform < "$2"
+        docker compose exec -T postgres-video psql -U upload_user video_platform < "$2"
         echo "✅ Video database restored!"
         ;;
-    
+
     "shell-auth")
         echo "🐘 Connecting to auth PostgreSQL..."
-        docker-compose exec postgres-auth psql -U app_user auth_db
+        docker compose exec postgres-auth psql -U app_user auth_db
         ;;
-    
+
     "shell-video")
         echo "🐘 Connecting to video PostgreSQL..."
-        docker-compose exec postgres-video psql -U upload_user video_platform
+        docker compose exec postgres-video psql -U upload_user video_platform
         ;;
-    
+
     "shell-redis")
         echo "🔴 Connecting to Redis..."
-        docker-compose exec redis redis-cli
+        docker compose exec redis redis-cli
         ;;
-    
+
     *)
         show_help
         exit 1
         ;;
-esac 
+esac
