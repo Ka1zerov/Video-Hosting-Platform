@@ -90,15 +90,18 @@ This directory contains the shared infrastructure for the entire Video Hosting P
 
 ## 📊 Port Allocation
 
+### Production Infrastructure
 | Service | Port | Purpose | Access |
 |---------|------|---------|---------|
 | postgres-auth | 5432 | Auth database | Internal |
 | postgres-video | 5433 | Video platform database | Internal |
+| postgres-encoding | 5434 | Encoding service database | Internal |
 | redis | 6379 | Shared cache | Internal |
 | rabbitmq | 5672 | Message broker | Internal |
 | rabbitmq-ui | 15672 | RabbitMQ management | http://localhost:15672 |
 | pgadmin-auth | 5050 | Auth DB admin | http://localhost:5050 |
 | pgadmin-video | 5051 | Video DB admin | http://localhost:5051 |
+| pgadmin-encoding | 5052 | Encoding DB admin | http://localhost:5052 |
 | redis-commander | 8081 | Redis admin | http://localhost:8081 |
 
 ## 🔧 Service Profiles
@@ -192,7 +195,15 @@ cd authentication
 - **Video DB Admin**: http://localhost:5051 (admin@video.local/admin)
 - **Redis Commander**: http://localhost:8081
 
-## 💾 Backup & Restore
+## 🧪 Testing
+
+Integration tests use **TestContainers** to automatically manage all required services:
+- **PostgreSQL**: Isolated database for each test run
+- **RabbitMQ**: Message broker for async communication
+
+TestContainers handles all container lifecycle management automatically - no manual setup required.
+
+## 🛠️ Backup & Restore
 
 ### Backup Databases
 ```bash
@@ -239,7 +250,8 @@ infrastructure/
 ├── config/
 │   ├── postgres/
 │   │   ├── auth-init/         # Auth DB initialization scripts
-│   │   └── video-init/        # Video DB initialization scripts
+│   │   ├── video-init/        # Video DB initialization scripts
+│   │   └── encoding-init/     # Encoding DB initialization scripts
 │   └── redis/
 │       └── redis.conf         # Redis configuration
 ├── README.md                  # This file

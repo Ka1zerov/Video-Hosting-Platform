@@ -205,4 +205,30 @@ The service is designed for horizontal scaling:
 - **Stateless Processing**: No shared state between instances
 - **Message Queue**: Distributes work across multiple instances
 - **Temporary Storage**: Uses instance-specific temp directories
-- **Database Coordination**: Uses database for job coordination 
+- **Database Coordination**: Uses database for job coordination
+
+### Test Configuration
+
+Integration tests automatically configure themselves for LocalStack:
+- **S3 Endpoint**: http://localhost:4566
+- **S3 Bucket**: test-bucket (created automatically)
+- **AWS Credentials**: test/test
+- **Cleanup**: Disabled (files preserved for inspection)
+
+TestContainers automatically configures all services - no manual setup required.
+
+### Integration Tests
+
+Integration tests use **TestContainers** to automatically manage all required services:
+
+```bash
+# Run integration tests
+./gradlew test --tests "*IntegrationTest"
+```
+
+TestContainers automatically starts:
+- **PostgreSQL**: Isolated database for each test run
+- **RabbitMQ**: Message broker for async communication
+- **LocalStack**: AWS S3 emulation
+
+No manual setup required - TestContainers handles everything! 

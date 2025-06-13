@@ -32,4 +32,6 @@ public interface EncodingJobRepository extends JpaRepository<EncodingJob, UUID> 
 
     @Query("SELECT COUNT(j) FROM EncodingJob j WHERE j.status = :status AND j.deletedAt IS NULL")
     long countByStatus(@Param("status") EncodingStatus status);
+
+    Optional<EncodingJob> findByS3Key(String s3Key);
 } 

@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  rabbitmq:
+    template:
+      exchange: video.exchange
+      routing-key: video.encoding
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          max-interval: 10000
+          multiplier: 2.0
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+
+ffmpeg:
+  path: ${FFMPEG_PATH:/opt/homebrew/bin/ffmpeg}
+  timeout: 300000 # 5 minutes
+
+ffprobe:
+  path: ${FFPROBE_PATH:/opt/homebrew/bin/ffprobe}
+
+logging:
+  level:
+    com.tskrypko.encoding: DEBUG
+    org.springframework.amqp: DEBUG
+    com.amazonaws: DEBUG
+    org.springframework: INFO
+    org.hibernate: INFO
+    org.liquibase: DEBUG 

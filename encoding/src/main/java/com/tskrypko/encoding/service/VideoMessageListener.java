@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -50,8 +51,15 @@ public class VideoMessageListener {
 
             logger.info("Created encoding job: {}", savedJob.getId());
 
-            // Start encoding process asynchronously
-            videoEncodingService.processEncodingJob(savedJob.getId().toString());
+            // Start encoding process asynchronously after transaction commit
+            TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        videoEncodingService.processEncodingJob(savedJob.getId().toString());
+                    }
+                }
+            );
 
         } catch (Exception e) {
             logger.error("Error processing video upload message: {}", e.getMessage(), e);

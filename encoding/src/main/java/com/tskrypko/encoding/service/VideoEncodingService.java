@@ -39,8 +39,52 @@ public class VideoEncodingService {
     @Value("${encoding.hls.segment.duration:10}")
     private int hlsSegmentDuration;
 
+    @Value("${encoding.cleanup.enabled:true}")
+    private boolean cleanupEnabled;
+
+    /**
+     * Processes a video encoding job asynchronously.
+     * 
+     * <p>This method is used in production to handle video encoding without blocking 
+     * the calling thread. The actual processing is delegated to {@link #processEncodingJobSync(String)}.
+     * 
+     * @param jobId the UUID string of the encoding job to process
+     * @see #processEncodingJobSync(String) for synchronous processing (used in tests)
+     */
     @Async
     public void processEncodingJob(String jobId) {
+        processEncodingJobSync(jobId);
+    }
+
+    /**
+     * Processes a video encoding job synchronously.
+     * 
+     * <p>This method performs the complete video encoding workflow:
+     * <ol>
+     *   <li>Downloads the original video from S3</li>
+     *   <li>Encodes video in multiple qualities (1080p, 720p, 480p)</li>
+     *   <li>Generates HLS playlists and segments</li>
+     *   <li>Creates thumbnails for each quality</li>
+     *   <li>Uploads all encoded content back to S3</li>
+     *   <li>Updates job status and optionally cleans up temporary files</li>
+     * </ol>
+     * 
+     * <p><strong>Usage in different environments:</strong>
+     * <ul>
+     *   <li><strong>Production</strong>: Called via {@link #processEncodingJob(String)} for async processing</li>
+     *   <li><strong>Testing</strong>: Called directly to ensure synchronous execution and prevent 
+     *       race conditions with TestContainers lifecycle</li>
+     * </ul>
+     * 
+     * <p><strong>Error handling:</strong> If any step fails, the job status is set to FAILED 
+     * and temporary files are cleaned up (if cleanup is enabled).
+     * 
+     * @param jobId the UUID string of the encoding job to process
+     * @throws IllegalArgumentException if the job with given ID is not found
+     * @see #processEncodingJob(String) for asynchronous version
+     * @see EncodingStatus for possible job statuses
+     */
+    public void processEncodingJobSync(String jobId) {
         try {
             EncodingJob job = encodingJobRepository.findById(java.util.UUID.fromString(jobId))
                     .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
@@ -61,7 +105,9 @@ public class VideoEncodingService {
             generateThumbnails(job, localInputFile);
 
             updateJobStatus(job, EncodingStatus.COMPLETED, null, LocalDateTime.now());
-            cleanupTempFiles(job);
+            if (cleanupEnabled) {
+                cleanupTempFiles(job);
+            }
 
             logger.info("Encoding job completed successfully: {}", job.getId());
 
@@ -235,9 +281,11 @@ public class VideoEncodingService {
                     job.setErrorMessage(errorMessage);
                     job.setRetryCount(job.getRetryCount() + 1);
                     encodingJobRepository.save(job);
+                    if (cleanupEnabled) {
+                        cleanupTempFiles(job);
+                    }
                     return null;
                 });
-                cleanupTempFiles(job);
             }
         } catch (Exception e) {
             logger.error("Error handling job error for {}: {}", jobId, e.getMessage(), e);
@@ -253,5 +301,10 @@ public class VideoEncodingService {
             logger.warn("Could not get video duration for {}: {}", inputFile, e.getMessage());
             return 0;
         }
+    }
+
+    public EncodingJob getJobByS3Key(String s3Key) {
+        return encodingJobRepository.findByS3Key(s3Key)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found for S3 key: " + s3Key));
     }
 }
