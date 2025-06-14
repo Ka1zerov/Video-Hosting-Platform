@@ -6,9 +6,9 @@ spring:
     name: encoding-service
   
   datasource:
-    url: jdbc:postgresql://localhost:5434/encoding_db
-    username: ${DB_USERNAME:encoding_user}
-    password: ${DB_PASSWORD:encoding_pass}
+    url: jdbc:postgresql://localhost:5433/video_platform
+    username: ${DB_USERNAME:upload_user}
+    password: ${DB_PASSWORD:upload_pass}
     driver-class-name: org.postgresql.Driver
   
   jpa:
@@ -22,9 +22,7 @@ spring:
         format_sql: true
   
   liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.yaml
-    enabled: true
-    contexts: encoding-service
+    enabled: false
   
   data:
     redis:

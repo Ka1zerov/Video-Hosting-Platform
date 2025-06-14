@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -17,7 +18,7 @@ public class EncodingJob extends BaseEntity {
 
     @NotNull(message = "Video ID is required")
     @Column(name = "video_id", nullable = false)
-    private String videoId;
+    private UUID videoId;
 
     @NotBlank(message = "User ID is required")
     @Column(name = "user_id", nullable = false)

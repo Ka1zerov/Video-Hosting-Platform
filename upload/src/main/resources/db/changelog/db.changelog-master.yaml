@@ -1,8 +1,4 @@
 databaseChangeLog:
   - include:
       file: changes/v1.0-video-changelog.sql
-      relativeToChangelogFile: true
-
-  - include:
-      file: changes/v2.0-soft-delete.sql
       relativeToChangelogFile: true 

@@ -13,65 +13,81 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface VideoRepository extends JpaRepository<Video, Long> {
+public interface VideoRepository extends JpaRepository<Video, UUID> {
     
     /**
-     * Find video by ID only if it's ready for streaming
+     * Find video by ID only if it's ready for streaming and not deleted
      */
-    Optional<Video> findByIdAndStatus(Long id, VideoStatus status);
+    Optional<Video> findByIdAndStatusAndDeletedAtIsNull(UUID id, VideoStatus status);
+    
+    /**
+     * Find video by ID if not deleted
+     */
+    Optional<Video> findByIdAndDeletedAtIsNull(UUID id);
     
     /**
      * Find videos that are ready for streaming
      */
-    Page<Video> findByStatusOrderByCreatedAtDesc(VideoStatus status, Pageable pageable);
+    Page<Video> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(VideoStatus status, Pageable pageable);
     
     /**
      * Find videos by user ID
      */
-    Page<Video> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, VideoStatus status, Pageable pageable);
+    Page<Video> findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(String userId, Pageable pageable);
+    
+    /**
+     * Find videos by user ID and status
+     */
+    Page<Video> findByUserIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String userId, VideoStatus status, Pageable pageable);
     
     /**
      * Search videos by title (case-insensitive)
      */
-    @Query("SELECT v FROM Video v WHERE LOWER(v.title) LIKE LOWER(CONCAT('%', :title, '%')) AND v.status = :status")
-    Page<Video> findByTitleContainingIgnoreCaseAndStatus(@Param("title") String title, @Param("status") VideoStatus status, Pageable pageable);
+    @Query("SELECT v FROM Video v WHERE LOWER(v.title) LIKE LOWER(CONCAT('%', :title, '%')) AND v.status = :status AND v.deletedAt IS NULL")
+    Page<Video> findByTitleContainingIgnoreCaseAndStatusAndDeletedAtIsNull(@Param("title") String title, @Param("status") VideoStatus status, Pageable pageable);
     
     /**
      * Get top viewed videos
      */
-    Page<Video> findByStatusOrderByViewsCountDescCreatedAtDesc(VideoStatus status, Pageable pageable);
+    Page<Video> findByStatusAndDeletedAtIsNullOrderByViewsCountDescCreatedAtDesc(VideoStatus status, Pageable pageable);
     
     /**
      * Get recently accessed videos
      */
-    Page<Video> findByStatusAndLastAccessedIsNotNullOrderByLastAccessedDesc(VideoStatus status, Pageable pageable);
+    Page<Video> findByStatusAndLastAccessedIsNotNullAndDeletedAtIsNullOrderByLastAccessedDesc(VideoStatus status, Pageable pageable);
     
     /**
-     * Update view count
+     * Update view count and last accessed time
      */
     @Modifying
     @Query("UPDATE Video v SET v.viewsCount = v.viewsCount + 1, v.lastAccessed = :accessTime WHERE v.id = :videoId")
-    void incrementViewCount(@Param("videoId") Long videoId, @Param("accessTime") LocalDateTime accessTime);
+    void incrementViewCount(@Param("videoId") UUID videoId, @Param("accessTime") LocalDateTime accessTime);
     
     /**
      * Find videos with HLS manifest URLs
      */
-    List<Video> findByStatusAndHlsManifestUrlIsNotNull(VideoStatus status);
+    List<Video> findByStatusAndHlsManifestUrlIsNotNullAndDeletedAtIsNull(VideoStatus status);
     
     /**
      * Find videos with DASH manifest URLs
      */
-    List<Video> findByStatusAndDashManifestUrlIsNotNull(VideoStatus status);
+    List<Video> findByStatusAndDashManifestUrlIsNotNullAndDeletedAtIsNull(VideoStatus status);
     
     /**
-     * Count videos by status
+     * Count videos by status (excluding deleted)
      */
-    long countByStatus(VideoStatus status);
+    long countByStatusAndDeletedAtIsNull(VideoStatus status);
+    
+    /**
+     * Count videos by user (excluding deleted)
+     */
+    long countByUserIdAndDeletedAtIsNull(String userId);
     
     /**
      * Find videos created after specific date
      */
-    List<Video> findByStatusAndCreatedAtAfterOrderByCreatedAtDesc(VideoStatus status, LocalDateTime date);
+    List<Video> findByStatusAndCreatedAtAfterAndDeletedAtIsNullOrderByCreatedAtDesc(VideoStatus status, LocalDateTime date);
 } 

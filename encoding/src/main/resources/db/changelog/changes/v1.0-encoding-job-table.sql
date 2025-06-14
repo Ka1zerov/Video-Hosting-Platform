@@ -4,7 +4,7 @@
 CREATE TABLE encoding_jobs
 (
     id                  UUID PRIMARY KEY,
-    video_id            VARCHAR(255) NOT NULL,
+    video_id            UUID NOT NULL,
     user_id             VARCHAR(255) NOT NULL,
     title               VARCHAR(255) NOT NULL,
     original_filename   VARCHAR(255) NOT NULL,
@@ -29,4 +29,11 @@ CREATE INDEX idx_encoding_jobs_video_id ON encoding_jobs(video_id);
 CREATE INDEX idx_encoding_jobs_user_id ON encoding_jobs(user_id);
 CREATE INDEX idx_encoding_jobs_status ON encoding_jobs(status);
 CREATE INDEX idx_encoding_jobs_created_at ON encoding_jobs(created_at);
-CREATE INDEX idx_encoding_jobs_deleted_at ON encoding_jobs(deleted_at) WHERE deleted_at IS NOT NULL; 
+CREATE INDEX idx_encoding_jobs_deleted_at ON encoding_jobs(deleted_at) WHERE deleted_at IS NOT NULL;
+
+--changeset TymofiiSkrypko:encoding-add-foreign-key-constraints context:encoding-service
+-- Foreign key to videos table (created by upload service)
+ALTER TABLE encoding_jobs 
+ADD CONSTRAINT fk_encoding_jobs_video_id 
+FOREIGN KEY (video_id) REFERENCES videos(id) 
+ON DELETE CASCADE ON UPDATE CASCADE; 

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Setter
 @Getter
@@ -17,7 +18,7 @@ public class ViewSession extends BaseEntity {
 
     @NotNull(message = "Video ID is required")
     @Column(name = "video_id", nullable = false)
-    private Long videoId;
+    private UUID videoId;
 
     @Column(name = "user_id")
     private String userId; // Can be null for anonymous users
@@ -53,7 +54,7 @@ public class ViewSession extends BaseEntity {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
-    public ViewSession(Long videoId, String sessionId, String ipAddress) {
+    public ViewSession(UUID videoId, String sessionId, String ipAddress) {
         this.videoId = videoId;
         this.sessionId = sessionId;
         this.ipAddress = ipAddress;

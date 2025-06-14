@@ -70,6 +70,24 @@ public class Video extends BaseEntity {
     @Column(name = "last_accessed")
     private LocalDateTime lastAccessed;
 
+    // Audit fields to match upload model
+    @Column(name = "created_by", nullable = false)
+    private String createdBy;
+
+    @Column(name = "modified_by", nullable = false)
+    private String modifiedBy;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void markAsDeleted() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @Override
     public String toString() {
         return "Video{" +

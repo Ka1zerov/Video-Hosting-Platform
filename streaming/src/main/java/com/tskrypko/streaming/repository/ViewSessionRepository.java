@@ -1,11 +1,9 @@
 package com.tskrypko.streaming.repository;
 
-import com.tskrypko.streaming.model.StreamQuality;
 import com.tskrypko.streaming.model.ViewSession;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -13,81 +11,89 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface ViewSessionRepository extends JpaRepository<ViewSession, Long> {
-    
+public interface ViewSessionRepository extends JpaRepository<ViewSession, UUID> {
+
     /**
-     * Find active session by session ID
+     * Find sessions by video ID
      */
-    Optional<ViewSession> findBySessionIdAndEndedAtIsNull(String sessionId);
+    List<ViewSession> findByVideoIdOrderByStartedAtDesc(UUID videoId);
     
+    Page<ViewSession> findByVideoIdOrderByStartedAtDesc(UUID videoId, Pageable pageable);
+
     /**
-     * Find sessions for specific video
+     * Find sessions by user ID
      */
-    Page<ViewSession> findByVideoIdOrderByStartedAtDesc(Long videoId, Pageable pageable);
+    List<ViewSession> findByUserIdOrderByStartedAtDesc(String userId);
     
-    /**
-     * Find sessions for specific user
-     */
     Page<ViewSession> findByUserIdOrderByStartedAtDesc(String userId, Pageable pageable);
-    
+
+    /**
+     * Find session by session ID
+     */
+    Optional<ViewSession> findBySessionId(String sessionId);
+
     /**
      * Find active sessions (not ended)
      */
-    List<ViewSession> findByEndedAtIsNullOrderByStartedAtDesc();
-    
+    List<ViewSession> findByEndedAtIsNullOrderByLastHeartbeatDesc();
+
     /**
-     * Find stale sessions (no heartbeat for given time)
+     * Find sessions by IP address
      */
-    @Query("SELECT vs FROM ViewSession vs WHERE vs.endedAt IS NULL AND vs.lastHeartbeat < :cutoffTime")
-    List<ViewSession> findStaleSessions(@Param("cutoffTime") LocalDateTime cutoffTime);
-    
+    List<ViewSession> findByIpAddressOrderByStartedAtDesc(String ipAddress);
+
     /**
-     * Update session heartbeat
+     * Count total sessions for a video
      */
-    @Modifying
-    @Query("UPDATE ViewSession vs SET vs.lastHeartbeat = :heartbeat, vs.watchDuration = :duration, vs.maxPosition = :position WHERE vs.sessionId = :sessionId")
-    void updateSessionHeartbeat(@Param("sessionId") String sessionId, 
-                              @Param("heartbeat") LocalDateTime heartbeat,
-                              @Param("duration") Long duration,
-                              @Param("position") Long position);
-    
+    long countByVideoId(UUID videoId);
+
     /**
-     * Update session quality
+     * Count unique users for a video (excluding anonymous)
      */
-    @Modifying
-    @Query("UPDATE ViewSession vs SET vs.quality = :quality WHERE vs.sessionId = :sessionId")
-    void updateSessionQuality(@Param("sessionId") String sessionId, @Param("quality") StreamQuality quality);
-    
+    @Query("SELECT COUNT(DISTINCT vs.userId) FROM ViewSession vs WHERE vs.videoId = :videoId AND vs.userId IS NOT NULL")
+    long countUniqueUsersForVideo(@Param("videoId") UUID videoId);
+
     /**
-     * End session
-     */
-    @Modifying
-    @Query("UPDATE ViewSession vs SET vs.endedAt = :endTime, vs.isComplete = :isComplete WHERE vs.sessionId = :sessionId")
-    void endSession(@Param("sessionId") String sessionId, @Param("endTime") LocalDateTime endTime, @Param("isComplete") Boolean isComplete);
-    
-    /**
-     * Get total watch time for video
-     */
-    @Query("SELECT COALESCE(SUM(vs.watchDuration), 0) FROM ViewSession vs WHERE vs.videoId = :videoId")
-    Long getTotalWatchTimeForVideo(@Param("videoId") Long videoId);
-    
-    /**
-     * Get unique viewers count for video
+     * Get unique viewers count for video (by IP)
      */
     @Query("SELECT COUNT(DISTINCT vs.ipAddress) FROM ViewSession vs WHERE vs.videoId = :videoId")
-    Long getUniqueViewersForVideo(@Param("videoId") Long videoId);
-    
+    Long getUniqueViewersForVideo(@Param("videoId") UUID videoId);
+
     /**
-     * Get session completion rate for video
+     * Get total watch time for a video
+     */
+    @Query("SELECT COALESCE(SUM(vs.watchDuration), 0) FROM ViewSession vs WHERE vs.videoId = :videoId")
+    Long getTotalWatchTimeForVideo(@Param("videoId") UUID videoId);
+
+    /**
+     * Get completion rate for video
      */
     @Query("SELECT (COUNT(vs) * 100.0 / NULLIF((SELECT COUNT(vs2) FROM ViewSession vs2 WHERE vs2.videoId = :videoId), 0)) " +
            "FROM ViewSession vs WHERE vs.videoId = :videoId AND vs.isComplete = true")
-    Double getCompletionRateForVideo(@Param("videoId") Long videoId);
-    
+    Double getCompletionRateForVideo(@Param("videoId") UUID videoId);
+
     /**
-     * Get sessions within date range
+     * Find sessions within date range
      */
-    List<ViewSession> findByStartedAtBetweenOrderByStartedAtDesc(LocalDateTime startDate, LocalDateTime endDate);
+    List<ViewSession> findByStartedAtBetweenOrderByStartedAtDesc(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Find completed sessions (watched to the end)
+     */
+    List<ViewSession> findByVideoIdAndIsCompleteOrderByStartedAtDesc(UUID videoId, Boolean isComplete);
+
+    /**
+     * Find sessions that need heartbeat cleanup (old active sessions)
+     */
+    @Query("SELECT vs FROM ViewSession vs WHERE vs.endedAt IS NULL AND vs.lastHeartbeat < :cutoffTime")
+    List<ViewSession> findStaleActiveSessions(@Param("cutoffTime") LocalDateTime cutoffTime);
+
+    /**
+     * Get analytics data - sessions by date
+     */
+    @Query("SELECT DATE(vs.startedAt) as date, COUNT(vs) as count FROM ViewSession vs WHERE vs.videoId = :videoId GROUP BY DATE(vs.startedAt) ORDER BY date DESC")
+    List<Object[]> getSessionsCountByDate(@Param("videoId") UUID videoId);
 } 

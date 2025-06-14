@@ -1,12 +1,13 @@
-package com.tskrypko.upload.model;
+package com.tskrypko.encoding.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
 
 @Setter
 @Getter
@@ -46,7 +47,6 @@ public class Video extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    // Streaming-specific fields
     @Column(name = "duration")
     private Long duration; // Duration in seconds
 
@@ -65,6 +65,23 @@ public class Video extends BaseEntity {
     @Column(name = "last_accessed")
     private LocalDateTime lastAccessed;
 
+    @Column(name = "created_by", nullable = false)
+    private String createdBy;
+
+    @Column(name = "modified_by", nullable = false)
+    private String modifiedBy;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void markAsDeleted() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @Override
     public String toString() {
         return "Video{" +
@@ -76,4 +93,4 @@ public class Video extends BaseEntity {
                 ", uploadedAt=" + uploadedAt +
                 '}';
     }
-}
+} 

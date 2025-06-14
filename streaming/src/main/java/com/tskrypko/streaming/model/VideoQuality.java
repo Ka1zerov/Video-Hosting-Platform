@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Setter
 @Getter
 @Entity
@@ -19,7 +21,7 @@ public class VideoQuality extends BaseEntity {
     private Video video;
 
     @Column(name = "video_id", insertable = false, updatable = false)
-    private Long videoId;
+    private UUID videoId;
 
     @NotBlank(message = "Quality name is required")
     @Column(name = "quality_name", nullable = false)

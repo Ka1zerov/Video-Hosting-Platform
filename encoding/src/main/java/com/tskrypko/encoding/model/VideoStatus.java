@@ -1,4 +1,4 @@
-package com.tskrypko.streaming.model;
+package com.tskrypko.encoding.model;
 
 public enum VideoStatus {
     UPLOADED,        // Video uploaded but not processed
