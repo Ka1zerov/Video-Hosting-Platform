@@ -23,7 +23,7 @@ public class SessionManagementService {
     /**
      * Generate unique session ID for video streaming
      */
-    public String generateSessionId(Long videoId, String userId, String ipAddress) {
+    public String generateSessionId(UUID videoId, String userId, String ipAddress) {
         try {
             String sessionId = UUID.randomUUID().toString();
             
@@ -42,7 +42,7 @@ public class SessionManagementService {
     /**
      * Validate that user has access to video
      */
-    public boolean validateVideoAccess(Long videoId, String userId) {
+    public boolean validateVideoAccess(UUID videoId, String userId) {
         try {
             // This will be validated in VideoStreamingService
             // based on video public status or ownership
@@ -58,7 +58,7 @@ public class SessionManagementService {
     /**
      * Track streaming session for analytics
      */
-    private void trackStreamSession(String sessionId, Long videoId, String userId, String ipAddress) {
+    private void trackStreamSession(String sessionId, UUID videoId, String userId, String ipAddress) {
         try {
             String sessionKey = SESSION_PREFIX + sessionId;
             StreamSessionInfo sessionInfo = new StreamSessionInfo(videoId, userId, ipAddress, LocalDateTime.now());
@@ -127,14 +127,14 @@ public class SessionManagementService {
 
     // Data class for Redis storage
     public static class StreamSessionInfo {
-        public Long videoId;
+        public UUID videoId;
         public String userId;
         public String ipAddress;
         public LocalDateTime startTime;
 
         public StreamSessionInfo() {}
 
-        public StreamSessionInfo(Long videoId, String userId, String ipAddress, LocalDateTime startTime) {
+        public StreamSessionInfo(UUID videoId, String userId, String ipAddress, LocalDateTime startTime) {
             this.videoId = videoId;
             this.userId = userId;
             this.ipAddress = ipAddress;

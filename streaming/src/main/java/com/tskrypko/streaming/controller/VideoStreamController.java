@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/streaming")
@@ -124,7 +126,7 @@ public class VideoStreamController {
      * Get video by ID (basic info without streaming URLs for security)
      */
     @GetMapping("/videos/{videoId}")
-    public ResponseEntity<VideoStreamResponse> getVideoById(@PathVariable Long videoId) {
+    public ResponseEntity<VideoStreamResponse> getVideoById(@PathVariable UUID videoId) {
         
         log.info("Getting video info for ID: {}", videoId);
         

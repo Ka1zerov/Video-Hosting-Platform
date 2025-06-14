@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -40,7 +41,7 @@ public class VideoStreamingService {
         log.info("Getting video stream for video ID: {}", request.getVideoId());
         
         // Find video that's ready for streaming
-        Video video = videoRepository.findByIdAndStatus(request.getVideoId(), VideoStatus.READY)
+        Video video = videoRepository.findByIdAndStatusAndDeletedAtIsNull(request.getVideoId(), VideoStatus.READY)
                 .orElseThrow(() -> new VideoNotFoundException("Video not found or not ready for streaming: " + request.getVideoId()));
 
         // Check access rights
@@ -49,7 +50,7 @@ public class VideoStreamingService {
 
         // Get available qualities
         List<VideoQuality> qualities = videoQualityRepository
-                .findByVideoIdAndEncodingStatusOrderByBitrateAsc(request.getVideoId(), EncodingStatus.COMPLETED);
+                .findByVideoIdAndEncodingStatusOrderByBitrateDesc(request.getVideoId(), EncodingStatus.COMPLETED);
 
         if (qualities.isEmpty()) {
             throw new VideoNotFoundException("No encoded qualities available for video: " + request.getVideoId());
@@ -120,7 +121,7 @@ public class VideoStreamingService {
      * Increment view count for video
      */
     @Transactional
-    public void incrementViewCount(Long videoId) {
+    public void incrementViewCount(UUID videoId) {
         log.debug("Incrementing view count for video: {}", videoId);
         videoRepository.incrementViewCount(videoId, LocalDateTime.now());
     }
@@ -132,7 +133,7 @@ public class VideoStreamingService {
     public Page<VideoStreamResponse> getAvailableVideos(Pageable pageable) {
         log.info("Getting available videos for streaming, page: {}", pageable.getPageNumber());
         
-        Page<Video> videos = videoRepository.findByStatusOrderByCreatedAtDesc(VideoStatus.READY, pageable);
+        Page<Video> videos = videoRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(VideoStatus.READY, pageable);
         
         return videos.map(this::mapToBasicResponse);
     }
@@ -144,7 +145,7 @@ public class VideoStreamingService {
     public Page<VideoStreamResponse> searchVideos(String title, Pageable pageable) {
         log.info("Searching videos by title: {}", title);
         
-        Page<Video> videos = videoRepository.findByTitleContainingIgnoreCaseAndStatus(title, VideoStatus.READY, pageable);
+        Page<Video> videos = videoRepository.findByTitleContainingIgnoreCaseAndStatusAndDeletedAtIsNull(title, VideoStatus.READY, pageable);
         
         return videos.map(this::mapToBasicResponse);
     }
@@ -156,7 +157,7 @@ public class VideoStreamingService {
     public Page<VideoStreamResponse> getPopularVideos(Pageable pageable) {
         log.info("Getting popular videos");
         
-        Page<Video> videos = videoRepository.findByStatusOrderByViewsCountDescCreatedAtDesc(VideoStatus.READY, pageable);
+        Page<Video> videos = videoRepository.findByStatusAndDeletedAtIsNullOrderByViewsCountDescCreatedAtDesc(VideoStatus.READY, pageable);
         
         return videos.map(this::mapToBasicResponse);
     }
@@ -168,7 +169,7 @@ public class VideoStreamingService {
     public Page<VideoStreamResponse> getRecentlyAccessedVideos(Pageable pageable) {
         log.info("Getting recently accessed videos");
         
-        Page<Video> videos = videoRepository.findByStatusAndLastAccessedIsNotNullOrderByLastAccessedDesc(VideoStatus.READY, pageable);
+        Page<Video> videos = videoRepository.findByStatusAndLastAccessedIsNotNullAndDeletedAtIsNullOrderByLastAccessedDesc(VideoStatus.READY, pageable);
         
         return videos.map(this::mapToBasicResponse);
     }
@@ -186,7 +187,7 @@ public class VideoStreamingService {
             throw new VideoAccessDeniedException("Cannot access videos for user: " + userId);
         }
         
-        Page<Video> videos = videoRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, VideoStatus.READY, pageable);
+        Page<Video> videos = videoRepository.findByUserIdAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(userId, VideoStatus.READY, pageable);
         
         return videos.map(this::mapToBasicResponse);
     }

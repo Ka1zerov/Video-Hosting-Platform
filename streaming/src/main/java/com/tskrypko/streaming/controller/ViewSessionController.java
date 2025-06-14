@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -30,7 +31,7 @@ public class ViewSessionController {
      */
     @PostMapping("/start")
     public ResponseEntity<ViewSession> startViewSession(
-            @RequestParam Long videoId,
+            @RequestParam UUID videoId,
             @RequestParam(required = false) String userId,
             HttpServletRequest request) {
         
@@ -92,7 +93,7 @@ public class ViewSessionController {
      */
     @GetMapping("/video/{videoId}")
     public ResponseEntity<Page<ViewSession>> getVideoSessions(
-            @PathVariable Long videoId,
+            @PathVariable UUID videoId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
@@ -125,7 +126,7 @@ public class ViewSessionController {
      * Get analytics for a video
      */
     @GetMapping("/analytics/{videoId}")
-    public ResponseEntity<ViewSessionService.VideoAnalytics> getVideoAnalytics(@PathVariable Long videoId) {
+    public ResponseEntity<ViewSessionService.VideoAnalytics> getVideoAnalytics(@PathVariable UUID videoId) {
         
         log.info("Getting analytics for video: {}", videoId);
         
@@ -149,7 +150,7 @@ public class ViewSessionController {
      * Get watch time for a video
      */
     @GetMapping("/watch-time/{videoId}")
-    public ResponseEntity<Long> getTotalWatchTime(@PathVariable Long videoId) {
+    public ResponseEntity<Long> getTotalWatchTime(@PathVariable UUID videoId) {
         
         log.debug("Getting total watch time for video: {}", videoId);
         
@@ -161,7 +162,7 @@ public class ViewSessionController {
      * Get unique viewers count for a video
      */
     @GetMapping("/viewers/{videoId}")
-    public ResponseEntity<Long> getUniqueViewersCount(@PathVariable Long videoId) {
+    public ResponseEntity<Long> getUniqueViewersCount(@PathVariable UUID videoId) {
         
         log.debug("Getting unique viewers count for video: {}", videoId);
         
@@ -173,7 +174,7 @@ public class ViewSessionController {
      * Get completion rate for a video
      */
     @GetMapping("/completion-rate/{videoId}")
-    public ResponseEntity<Double> getCompletionRate(@PathVariable Long videoId) {
+    public ResponseEntity<Double> getCompletionRate(@PathVariable UUID videoId) {
         
         log.debug("Getting completion rate for video: {}", videoId);
         
