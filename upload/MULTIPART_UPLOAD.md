@@ -81,6 +81,16 @@ partNumber: 1
 chunk: <binary data>
 ```
 
+**Parameters:**
+- `uploadId`: Upload session ID from initiate response (required)
+- `partNumber`: Part number (1 to totalParts, required)  
+- `chunk`: Binary file chunk (required, multipart file)
+
+**Important Notes:**
+- `uploadId`: Must be a valid UUID from initiate response
+- `partNumber`: Must be between 1 and totalParts (inclusive)
+- `chunk`: Binary data, minimum 5MB (except last part)
+
 **Response:**
 ```json
 {

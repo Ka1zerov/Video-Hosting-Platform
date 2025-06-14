@@ -1,6 +1,6 @@
 # Upload Service
 
-Upload Service is part of the Video Hosting Platform and handles video file upload processing.
+Upload Service is part of the Video Hosting Platform and handles video file upload processing with advanced reliability features.
 
 ## Features
 
@@ -16,10 +16,15 @@ Upload Service is part of the Video Hosting Platform and handles video file uplo
 - **Redis caching** for performance optimization
 - **Database replication** support for high availability
 - **Multipart Upload** for large video files with chunked uploading
+- **Advanced reliability features**:
+  - **Transaction-safe message publishing** - prevents data inconsistency
+  - **Automatic cleanup** of expired upload sessions
+  - **Timeout management** for multipart uploads
+  - **S3 garbage collection** for incomplete uploads
 
 ## 🧩 Multipart Upload Support
 
-Support for multipart upload of large video files using S3 chunked uploading.
+Support for multipart upload of large video files using S3 chunked uploading with enterprise-grade reliability.
 
 ### ✅ **Why Multipart Upload?**
 
@@ -30,6 +35,8 @@ For video hosting platforms, multipart upload is **essential** because:
 - 🛡️ **Reliability** - only failed parts need to be retried
 - 🚀 **Performance** - faster for large files (>100MB)
 - 💾 **Memory efficient** - no need to load entire file in memory
+- 🧹 **Automatic cleanup** - expired sessions are automatically cleaned up
+- ⏰ **Timeout management** - prevents resource leaks
 
 ### 📊 **Technical Details**
 
@@ -39,6 +46,8 @@ For video hosting platforms, multipart upload is **essential** because:
 - **Session storage**: Redis with 24h TTL
 - **Progress tracking**: Real-time upload progress
 - **Error handling**: Automatic cleanup on failures
+- **Timeout handling**: Active session expiry checking
+- **S3 cleanup**: Automatic removal of orphaned multipart uploads
 
 ### 🔗 **API Endpoints**
 
@@ -48,6 +57,11 @@ POST   /api/upload/multipart/upload-chunk # Upload single chunk
 POST   /api/upload/multipart/complete/{id} # Complete upload
 DELETE /api/upload/multipart/abort/{id}   # Cancel upload
 GET    /api/upload/multipart/status/{id}  # Check progress
+
+# Admin endpoints for monitoring and management
+GET    /api/upload/multipart/admin/cleanup-stats    # Get cleanup statistics
+POST   /api/upload/multipart/admin/cleanup          # Trigger manual cleanup
+DELETE /api/upload/multipart/admin/cleanup/{id}     # Clean specific session
 ```
 
 ### 🏗️ **Architecture Enhancement**
@@ -58,6 +72,8 @@ Frontend ──► MultipartController ──► MultipartService ──► S3
     │              │                      └─► Redis ──────┘
     │              │                      │
     │              │                      └─► PostgreSQL ──► RabbitMQ
+    │              │                      │
+    │              │                      └─► CleanupService
     │              │
     └─── Progress ←┘
 ```
@@ -66,6 +82,103 @@ Frontend ──► MultipartController ──► MultipartService ──► S3
 
 For detailed multipart upload usage, examples, and integration guide, see:
 **[MULTIPART_UPLOAD.md](MULTIPART_UPLOAD.md)**
+
+## 🔒 **Reliability & Data Consistency**
+
+### **Transaction-Safe Message Publishing**
+
+The service implements advanced transaction handling to prevent data inconsistency:
+
+```java
+// Transaction-safe approach
+@Transactional
+public UploadResponse uploadVideo() {
+    Video video = videoRepository.save(video);
+    // Transaction commits here
+}
+// Message sent AFTER transaction commit
+sendToEncodingQueueSafely(video);
+```
+
+**Benefits:**
+- ✅ **Data consistency** - video always saved before message sent
+- ✅ **Fault tolerance** - message failures don't corrupt database
+- ✅ **Monitoring** - CRITICAL logs for failed message publishing
+- ✅ **Flexible handling** - choose strict or safe message publishing
+
+### **Message Publishing Options**
+
+1. **`sendToEncodingQueueSafely()`** (Default)
+   - Does NOT affect transaction
+   - Logs errors as CRITICAL for monitoring
+   - Prevents data inconsistency
+
+2. **`sendToEncodingQueueStrictly()`** (Optional)
+   - DOES affect transaction
+   - Rolls back on message failure
+   - Use when strict consistency required
+
+## 🧹 **Automatic Cleanup System**
+
+### **MultipartCleanupService**
+
+Automated cleanup service that runs every hour to maintain system health:
+
+```java
+@Scheduled(fixedRate = 3600000) // Every hour
+public void cleanupExpiredSessions() {
+    // Clean expired Redis sessions
+    // Clean orphaned S3 multipart uploads
+}
+```
+
+**Features:**
+- ✅ **Automatic cleanup** of expired sessions
+- ✅ **S3 garbage collection** - removes incomplete uploads
+- ✅ **Cost optimization** - prevents S3 storage waste
+- ✅ **Configurable** - adjust cleanup intervals and timeouts
+- ✅ **Monitoring** - detailed cleanup statistics
+- ✅ **Manual control** - admin endpoints for immediate cleanup
+
+### **Cleanup Configuration**
+
+```yaml
+multipart:
+  cleanup:
+    enabled: true           # Enable/disable cleanup
+    max-age-hours: 24      # Session timeout in hours
+```
+
+### **Cleanup Statistics**
+
+Monitor cleanup operations via admin API:
+
+```json
+{
+  "totalRedisSessions": 15,
+  "totalS3Uploads": 8,
+  "maxAgeHours": 24,
+  "cleanupEnabled": true
+}
+```
+
+## ⏰ **Timeout Management**
+
+### **Active Session Validation**
+
+Every multipart operation includes timeout checking:
+
+- **Upload chunk**: Validates session before processing
+- **Complete upload**: Ensures session hasn't expired
+- **Status check**: Returns accurate session state
+- **Automatic cleanup**: Removes expired sessions immediately
+
+### **Benefits**
+
+- 🚫 **Prevents resource waste** - no processing of expired sessions
+- 🔍 **Clear error messages** - users know when sessions expire
+- 🧹 **Immediate cleanup** - expired sessions cleaned on access
+- 📊 **Better monitoring** - track session lifecycle
 
 ## Database Schema
 
@@ -149,6 +262,13 @@ Note: Permanently removes video metadata from database. Video must be soft-delet
 GET /api/upload/health
 ```
 
+### Admin endpoints
+```http
+GET    /api/upload/multipart/admin/cleanup-stats    # Cleanup statistics
+POST   /api/upload/multipart/admin/cleanup          # Trigger cleanup
+DELETE /api/upload/multipart/admin/cleanup/{id}     # Clean specific session
+```
+
 ## Docker Development Setup
 
 ### Single Instance (Development)
@@ -226,99 +346,99 @@ HAProxy Stats:    localhost:8404
 Master ----WAL Stream----> Slave
 ```
 
-**Плюсы:**
-- ✅ Простота настройки и управления
-- ✅ Минимальная задержка репликации (< 1s)
-- ✅ Автоматическое восстановление после сбоев
-- ✅ Возможность чтения с replica
-- ✅ Встроенная поддержка в PostgreSQL
+**Pros:**
+- ✅ Simple setup and management
+- ✅ Minimal replication lag (< 1s)
+- ✅ Automatic recovery after failures
+- ✅ Read capability from replica
+- ✅ Built-in PostgreSQL support
 
-**Минусы:**
-- ❌ Асинхронная репликация (возможна потеря данных)
+**Cons:**
+- ❌ Asynchronous replication (possible data loss)
 - ❌ Single point of failure (master)
-- ❌ Ручное переключение на slave при сбое master
+- ❌ Manual failover to slave required
 
 #### **2. Synchronous Replication**
 ```yaml
-# В postgresql.conf master
+# In postgresql.conf master
 synchronous_standby_names = 'slave1'
 synchronous_commit = on
 ```
 
-**Плюсы:**
-- ✅ Гарантированная консистентность данных
-- ✅ Нет потери данных при сбое master
+**Pros:**
+- ✅ Guaranteed data consistency
+- ✅ No data loss on master failure
 
-**Минусы:**
-- ❌ Значительно медленнее (ждет подтверждения от slave)
-- ❌ При недоступности slave блокируются записи
+**Cons:**
+- ❌ Significantly slower (waits for slave confirmation)
+- ❌ Writes blocked when slave unavailable
 
 #### **3. Logical Replication**
 ```sql
--- На master
+-- On master
 CREATE PUBLICATION video_pub FOR TABLE videos;
 
--- На slave  
+-- On slave  
 CREATE SUBSCRIPTION video_sub 
 CONNECTION 'host=master port=5432 user=replica_user dbname=video_platform' 
 PUBLICATION video_pub;
 ```
 
-**Плюсы:**
-- ✅ Селективная репликация (только нужные таблицы)
-- ✅ Возможность фильтрации данных
-- ✅ Репликация между разными версиями PostgreSQL
+**Pros:**
+- ✅ Selective replication (specific tables only)
+- ✅ Data filtering capabilities
+- ✅ Cross-version PostgreSQL replication
 - ✅ Bi-directional replication
 
-**Минусы:**
-- ❌ Больше нагрузки на master
-- ❌ Сложнее настройка и мониторинг
+**Cons:**
+- ❌ Higher master load
+- ❌ Complex setup and monitoring
 
-### ⚖️ **Сравнение подходов для Upload Service**
+### ⚖️ **Comparison for Upload Service**
 
-| Критерий | Streaming | Synchronous | Logical |
+| Criteria | Streaming | Synchronous | Logical |
 |----------|-----------|-------------|---------|
-| **Простота** | 🟢 High | 🟡 Medium | 🔴 Low |
-| **Производительность** | 🟢 High | 🔴 Low | 🟡 Medium |
-| **Консистентность** | 🟡 Eventual | 🟢 Strong | 🟡 Eventual |
+| **Simplicity** | 🟢 High | 🟡 Medium | 🔴 Low |
+| **Performance** | 🟢 High | 🔴 Low | 🟡 Medium |
+| **Consistency** | 🟡 Eventual | 🟢 Strong | 🟡 Eventual |
 | **Failover** | 🟡 Manual | 🟡 Manual | 🔴 Complex |
-| **Ресурсы** | 🟢 Low | 🟡 Medium | 🔴 High |
+| **Resources** | 🟢 Low | 🟡 Medium | 🔴 High |
 
-### 🎯 **Рекомендация для Upload Service**
+### 🎯 **Recommendation for Upload Service**
 
-**Для разработки/тестирования:**
+**For development/testing:**
 ```bash
-./scripts/docker-dev.sh start  # Простая схема
+./scripts/docker-dev.sh start  # Simple setup
 ```
 
-**Для продакшена:**
+**For production:**
 ```bash
 docker-compose -f docker-compose-replica.yml up -d  # Streaming replication
 ```
 
-### 📊 **Мониторинг репликации**
+### 📊 **Replication Monitoring**
 
 ```sql
--- Проверка статуса репликации на master
+-- Check replication status on master
 SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn 
 FROM pg_stat_replication;
 
--- Проверка задержки репликации на slave
+-- Check replication lag on slave
 SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) AS lag_seconds;
 
--- Размер WAL файлов
+-- WAL file size
 SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)) AS lag_size
 FROM pg_stat_replication;
 ```
 
-### 🛠️ **Управление репликацией**
+### 🛠️ **Replication Management**
 
 ```bash
-# Promote slave to master (при сбое master)
+# Promote slave to master (on master failure)
 docker-compose -f docker-compose-replica.yml exec postgres-slave \
   su - postgres -c "pg_ctl promote -D /var/lib/postgresql/data"
 
-# Rebuild slave после failover
+# Rebuild slave after failover
 docker-compose -f docker-compose-replica.yml stop postgres-slave
 docker volume rm upload_postgres_slave_data
 docker-compose -f docker-compose-replica.yml up -d postgres-slave
@@ -366,6 +486,10 @@ docker-compose -f docker-compose-replica.yml up -d postgres-slave
 - `RABBITMQ_PORT` - RabbitMQ port (default: 5672)
 - `RABBITMQ_USERNAME` - RabbitMQ username (default: guest)
 - `RABBITMQ_PASSWORD` - RabbitMQ password (default: guest)
+
+#### Multipart Upload Cleanup
+- `MULTIPART_CLEANUP_ENABLED` - Enable/disable cleanup (default: true)
+- `MULTIPART_CLEANUP_MAX_AGE_HOURS` - Session timeout in hours (default: 24)
 
 ## Supported Video Formats
 
@@ -439,7 +563,24 @@ To run migrations manually:
 
 ## Monitoring
 
-Available monitoring endpoints:
+### Application Health
 - `/actuator/health` - application health
 - `/actuator/info` - application information
-- `/actuator/metrics` - application metrics 
+- `/actuator/metrics` - application metrics
+
+### Cleanup Monitoring
+- `/api/upload/multipart/admin/cleanup-stats` - cleanup statistics
+- Monitor logs for cleanup operations and CRITICAL message failures
+
+### Key Metrics to Monitor
+- **Cleanup operations**: Number of cleaned sessions and S3 uploads
+- **Message publishing**: CRITICAL logs indicate failed message publishing
+- **Session timeouts**: Track expired session frequency
+- **S3 costs**: Monitor reduction from automatic cleanup
+
+### Log Patterns
+```
+INFO  - Multipart cleanup completed: 5 Redis sessions, 3 S3 uploads
+WARN  - Upload session expired: uploadId=abc123
+CRITICAL - Failed to send multipart upload message to queue - manual intervention may be required for videoId=xyz789
+``` 

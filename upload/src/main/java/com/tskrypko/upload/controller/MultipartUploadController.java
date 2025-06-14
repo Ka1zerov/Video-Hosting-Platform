@@ -4,7 +4,11 @@ import com.tskrypko.upload.dto.*;
 import com.tskrypko.upload.model.MultipartUploadSession;
 import com.tskrypko.upload.service.CurrentUserService;
 import com.tskrypko.upload.service.MultipartUploadService;
+import com.tskrypko.upload.service.MultipartCleanupService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,7 @@ public class MultipartUploadController {
 
     private final MultipartUploadService multipartUploadService;
     private final CurrentUserService currentUserService;
+    private final MultipartCleanupService cleanupService;
 
     /**
      * Initialize multipart upload
@@ -57,8 +62,8 @@ public class MultipartUploadController {
     @PostMapping(value = "/upload-chunk", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ChunkUploadResponse> uploadChunk(
             @RequestParam("chunk") MultipartFile chunk,
-            @RequestParam("uploadId") String uploadId,
-            @RequestParam("partNumber") Integer partNumber) {
+            @RequestParam("uploadId") @NotBlank String uploadId,
+            @RequestParam("partNumber") @NotNull @Min(1) Integer partNumber) {
 
         try {
             ChunkUploadResponse response = multipartUploadService.uploadChunk(uploadId, partNumber, chunk);
@@ -159,5 +164,53 @@ public class MultipartUploadController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Multipart Upload Service is running");
+    }
+
+    /**
+     * Get cleanup statistics - admin endpoint
+     */
+    @GetMapping("/admin/cleanup-stats")
+    public ResponseEntity<MultipartCleanupService.CleanupStats> getCleanupStats() {
+        try {
+            MultipartCleanupService.CleanupStats stats = cleanupService.getCleanupStats();
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            logger.error("Error getting cleanup stats", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Manually trigger cleanup - admin endpoint
+     */
+    @PostMapping("/admin/cleanup")
+    public ResponseEntity<String> triggerCleanup() {
+        try {
+            cleanupService.cleanupExpiredSessions();
+            return ResponseEntity.ok("Cleanup triggered successfully");
+        } catch (Exception e) {
+            logger.error("Error triggering cleanup", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to trigger cleanup: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Manually cleanup specific session - admin endpoint
+     */
+    @DeleteMapping("/admin/cleanup/{uploadId}")
+    public ResponseEntity<String> cleanupSession(@PathVariable("uploadId") String uploadId) {
+        try {
+            boolean cleaned = cleanupService.cleanupSession(uploadId);
+            if (cleaned) {
+                return ResponseEntity.ok("Session cleaned successfully");
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            logger.error("Error cleaning session: {}", uploadId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to cleanup session: " + e.getMessage());
+        }
     }
 } 

@@ -7,9 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tskrypko.upload.dto.*;
 import com.tskrypko.upload.model.MultipartUploadSession;
 import com.tskrypko.upload.model.Video;
-import com.tskrypko.upload.model.VideoStatus;
 import com.tskrypko.upload.repository.VideoRepository;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,19 +19,16 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
-public class MultipartUploadService {
+public class MultipartUploadService extends BaseVideoService {
 
     private static final Logger logger = LoggerFactory.getLogger(MultipartUploadService.class);
 
     // Minimum part size - 5 MB (except for the last part)
-    private static final long MIN_PART_SIZE = 5 * 1024 * 1024;
+    private static final long MIN_PART_SIZE = MIN_MULTIPART_SIZE;
 
     // Maximum number of parts in S3 multipart upload
     private static final int MAX_PARTS = 10000;
@@ -41,18 +36,10 @@ public class MultipartUploadService {
     // TTL for sessions in Redis (24 hours)
     private static final long SESSION_TTL_HOURS = 24;
 
-    private static final List<String> ALLOWED_VIDEO_TYPES = Arrays.asList(
-            "video/mp4", "video/avi", "video/mov", "video/wmv", "video/flv",
-            "video/webm", "video/mkv", "video/m4v"
-    );
-
-    private static final long MAX_FILE_SIZE = 2L * 1024 * 1024 * 1024; // 2GB
-
     private final AmazonS3 amazonS3;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-    private final VideoRepository videoRepository;
-    private final MessagePublisher messagePublisher;
+    private final MultipartCleanupService cleanupService;
 
     @Value("${aws.s3.bucket.name}")
     private String bucketName;
@@ -60,17 +47,31 @@ public class MultipartUploadService {
     @Value("${aws.s3.bucket.prefix:videos/}")
     private String keyPrefix;
 
+    public MultipartUploadService(VideoRepository videoRepository, MessagePublisher messagePublisher,
+                                AmazonS3 amazonS3, RedisTemplate<String, String> redisTemplate, 
+                                ObjectMapper objectMapper, MultipartCleanupService cleanupService) {
+        super(videoRepository, messagePublisher);
+        this.amazonS3 = amazonS3;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.cleanupService = cleanupService;
+    }
+
     /**
-     * Initialize multipart upload
+     * Initialize multipart upload - using unified DTO
      */
-    public MultipartUploadResponse initiateMultipartUpload(MultipartUploadRequest request, String userId) {
+    public MultipartUploadResponse initiateMultipartUpload(VideoUploadRequest request, String userId) {
         logger.info("Initiating multipart upload for user {}: {}", userId, request.getTitle());
 
-        // Validation
-        validateUploadRequest(request);
+        // Use inherited validation for metadata
+        validateVideoMetadata(request.getTitle(), request.getDescription(), 
+                            request.getOriginalFilename(), request.getFileSize(), request.getMimeType());
 
-        // Generate unique key
-        String s3Key = generateUniqueKey(userId, getFileExtension(request.getOriginalFilename()));
+        // Additional multipart-specific validation
+        validateMultipartRequest(request);
+
+        // Generate unique key using inherited method
+        String s3Key = generateUniqueKey(userId, getFileExtension(request.getOriginalFilename()), keyPrefix);
 
         // Initialize multipart upload in S3
         InitiateMultipartUploadRequest s3Request = new InitiateMultipartUploadRequest(bucketName, s3Key);
@@ -120,12 +121,33 @@ public class MultipartUploadService {
         );
     }
 
+    // Backward compatibility method
+    public MultipartUploadResponse initiateMultipartUpload(MultipartUploadRequest request, String userId) {
+        // Convert to unified DTO
+        VideoUploadRequest unifiedRequest = new VideoUploadRequest(
+            request.getTitle(), 
+            request.getDescription(),
+            request.getOriginalFilename(),
+            request.getFileSize(),
+            request.getMimeType()
+        );
+        
+        return initiateMultipartUpload(unifiedRequest, userId);
+    }
+
     /**
-     * Upload individual chunk
+     * Upload individual chunk with timeout check
      */
     public ChunkUploadResponse uploadChunk(String uploadId, Integer partNumber, MultipartFile chunk) {
         logger.info("Uploading chunk: uploadId={}, partNumber={}, size={}",
                 uploadId, partNumber, chunk.getSize());
+
+        // Check if session is expired
+        if (cleanupService.isSessionExpired(uploadId)) {
+            logger.warn("Upload session expired: {}", uploadId);
+            cleanupService.cleanupSession(uploadId);
+            throw new IllegalArgumentException("Upload session expired: " + uploadId);
+        }
 
         // Get session from Redis
         MultipartUploadSession session = getSessionFromRedis(uploadId);
@@ -178,11 +200,18 @@ public class MultipartUploadService {
     }
 
     /**
-     * Complete multipart upload
+     * Complete multipart upload with improved transaction handling
      */
     @Transactional
     public UploadResponse completeMultipartUpload(String uploadId) {
         logger.info("Completing multipart upload: {}", uploadId);
+
+        // Check if session is expired
+        if (cleanupService.isSessionExpired(uploadId)) {
+            logger.warn("Upload session expired during completion: {}", uploadId);
+            cleanupService.cleanupSession(uploadId);
+            throw new IllegalArgumentException("Upload session expired: " + uploadId);
+        }
 
         // Get session
         MultipartUploadSession session = getSessionFromRedis(uploadId);
@@ -196,6 +225,8 @@ public class MultipartUploadService {
                     session.getUploadedPartsCount() + "/" + session.getTotalParts());
         }
 
+        Video savedVideo = null;
+        
         try {
             // Prepare parts list for completion
             List<PartETag> partETags = new ArrayList<>();
@@ -213,34 +244,24 @@ public class MultipartUploadService {
 
             CompleteMultipartUploadResult completeResult = amazonS3.completeMultipartUpload(completeRequest);
 
-            // Create video record in database
-            Video video = createVideoRecord(session);
-            Video savedVideo = videoRepository.save(video);
+            // Create video record using inherited method
+            Video video = createVideoRecord(
+                session.getTitle(),
+                session.getDescription(),
+                session.getOriginalFilename(),
+                session.getFileSize(),
+                session.getMimeType(),
+                session.getUserId(),
+                session.getS3Key()
+            );
+            
+            savedVideo = videoRepository.save(video);
 
-            // Send message to queue
-            try {
-                messagePublisher.publishVideoUploadedMessage(savedVideo);
-                logger.info("Video upload message sent to queue: videoId={}", savedVideo.getId());
-            } catch (Exception e) {
-                logger.error("Error sending message to queue (non-critical): {}", e.getMessage(), e);
-            }
-
-            // Delete session from Redis
+            // Delete session from Redis (within transaction)
             deleteSessionFromRedis(uploadId);
 
             logger.info("Multipart upload completed successfully: uploadId={}, videoId={}, s3Key={}",
                     uploadId, savedVideo.getId(), session.getS3Key());
-
-            return new UploadResponse(
-                    savedVideo.getId(),
-                    savedVideo.getTitle(),
-                    savedVideo.getDescription(),
-                    savedVideo.getOriginalFilename(),
-                    savedVideo.getFileSize(),
-                    savedVideo.getStatus(),
-                    savedVideo.getUploadedAt(),
-                    "Video successfully uploaded via multipart upload"
-            );
 
         } catch (Exception e) {
             logger.error("Error completing multipart upload: uploadId={}, error={}",
@@ -256,6 +277,15 @@ public class MultipartUploadService {
 
             throw new RuntimeException("Failed to complete multipart upload", e);
         }
+
+        // IMPORTANT: Send message AFTER transaction is committed
+        // This prevents data inconsistency if message sending fails
+        if (savedVideo != null) {
+            sendToEncodingQueueSafely(savedVideo, "Multipart");
+        }
+
+        // Use inherited method to create response
+        return createUploadResponse(savedVideo, "Video successfully uploaded via multipart upload");
     }
 
     /**
@@ -290,18 +320,9 @@ public class MultipartUploadService {
         return getSessionFromRedis(uploadId);
     }
 
-    // Private methods
+    // Private methods - only multipart-specific logic
 
-    private void validateUploadRequest(MultipartUploadRequest request) {
-        if (request.getFileSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("File size exceeds maximum allowed size (2GB)");
-        }
-
-        if (!ALLOWED_VIDEO_TYPES.contains(request.getMimeType().toLowerCase())) {
-            throw new IllegalArgumentException("Unsupported file type. Allowed: " +
-                    String.join(", ", ALLOWED_VIDEO_TYPES));
-        }
-
+    private void validateMultipartRequest(VideoUploadRequest request) {
         if (request.getFileSize() < MIN_PART_SIZE) {
             throw new IllegalArgumentException("File too small for multipart upload. Minimum: " +
                     (MIN_PART_SIZE / 1024 / 1024) + " MB");
@@ -343,36 +364,10 @@ public class MultipartUploadService {
         return partSize;
     }
 
-    private String generateUniqueKey(String userId, String fileExtension) {
-        String timestamp = String.valueOf(System.currentTimeMillis());
-        String uuid = UUID.randomUUID().toString();
-        return String.format("%s%s/%s_%s%s", keyPrefix, userId, timestamp, uuid, fileExtension);
-    }
-
-    private String getFileExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return "";
-        }
-        return filename.substring(filename.lastIndexOf("."));
-    }
-
-    private Video createVideoRecord(MultipartUploadSession session) {
-        Video video = new Video();
-        video.setTitle(session.getTitle());
-        video.setDescription(session.getDescription());
-        video.setOriginalFilename(session.getOriginalFilename());
-        video.setFileSize(session.getFileSize());
-        video.setMimeType(session.getMimeType());
-        video.setUserId(session.getUserId());
-        video.setS3Key(session.getS3Key());
-        video.setStatus(VideoStatus.UPLOADED);
-        return video;
-    }
-
     private void saveSessionToRedis(String uploadId, MultipartUploadSession session) {
         try {
             String sessionJson = objectMapper.writeValueAsString(session);
-            String key = "multipart:upload:" + uploadId;
+            String key = "multipart:session:" + uploadId; // Changed key format for cleanup service
             redisTemplate.opsForValue().set(key, sessionJson, SESSION_TTL_HOURS, TimeUnit.HOURS);
         } catch (JsonProcessingException e) {
             logger.error("Error saving session to Redis: {}", e.getMessage(), e);
@@ -382,7 +377,7 @@ public class MultipartUploadService {
 
     private MultipartUploadSession getSessionFromRedis(String uploadId) {
         try {
-            String key = "multipart:upload:" + uploadId;
+            String key = "multipart:session:" + uploadId; // Changed key format for cleanup service
             String sessionJson = redisTemplate.opsForValue().get(key);
 
             if (sessionJson == null) {
@@ -397,7 +392,7 @@ public class MultipartUploadService {
     }
 
     private void deleteSessionFromRedis(String uploadId) {
-        String key = "multipart:upload:" + uploadId;
+        String key = "multipart:session:" + uploadId; // Changed key format for cleanup service
         redisTemplate.delete(key);
     }
-}
+} 

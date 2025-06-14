@@ -2,7 +2,6 @@ package com.tskrypko.streaming.service;
 
 import com.amazonaws.services.cloudfront.AmazonCloudFront;
 import com.amazonaws.services.cloudfront.AmazonCloudFrontClientBuilder;
-import com.amazonaws.services.cloudfront.util.SignerUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,8 +10,6 @@ import org.springframework.util.StringUtils;
 
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.Date;
 
 @Slf4j
 @Service
@@ -21,16 +18,16 @@ public class CloudFrontService {
 
     @Value("${aws.cloudfront.domain:}")
     private String cloudFrontDomain;
-    
+
     @Value("${aws.cloudfront.enabled:false}")
     private boolean cloudFrontEnabled;
-    
+
     @Value("${aws.s3.bucket.name}")
     private String s3BucketName;
-    
+
     @Value("${streaming.cdn.cache-control:public, max-age=31536000}")
     private String defaultCacheControl;
-    
+
     @Value("${streaming.cdn.manifest-cache-control:public, max-age=60}")
     private String manifestCacheControl;
 
@@ -73,7 +70,7 @@ public class CloudFrontService {
             String cdnUrl = "https://" + cloudFrontDomain + "/" + s3Key;
             log.debug("Converted S3 URL {} to CDN URL {}", s3Url, cdnUrl);
             return cdnUrl;
-            
+
         } catch (Exception e) {
             log.error("Error converting S3 URL to CDN URL: {}", s3Url, e);
             return s3Url;
@@ -90,14 +87,14 @@ public class CloudFrontService {
 
         try {
             String cdnUrl = getCdnUrl(s3Url);
-            
+
             // For now, return unsigned URL
             // In production, you would implement CloudFront signed URLs here
             // using SignerUtils.signUrlCanned() with your private key
-            
+
             log.debug("Generated signed CDN URL for: {}", s3Url);
             return cdnUrl;
-            
+
         } catch (Exception e) {
             log.error("Error generating signed CDN URL: {}", s3Url, e);
             return s3Url;
@@ -111,12 +108,12 @@ public class CloudFrontService {
         if (url == null) {
             return defaultCacheControl;
         }
-        
+
         // Shorter cache for manifests (they change more frequently)
         if (url.contains(".m3u8") || url.contains(".mpd")) {
             return manifestCacheControl;
         }
-        
+
         // Longer cache for video segments and static content
         return defaultCacheControl;
     }
@@ -128,14 +125,14 @@ public class CloudFrontService {
         try {
             URL url = new URL(s3Url);
             String path = url.getPath();
-            
+
             // Remove leading slash
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
-            
+
             return path;
-            
+
         } catch (Exception e) {
             log.error("Error extracting S3 key from URL: {}", s3Url, e);
             return null;
@@ -154,9 +151,9 @@ public class CloudFrontService {
         try {
             // In production, you would implement CloudFront invalidation here
             // using createInvalidation() API call
-            
+
             log.info("CloudFront cache invalidation requested for {} paths", paths.length);
-            
+
         } catch (Exception e) {
             log.error("Error invalidating CloudFront cache", e);
         }
@@ -173,11 +170,11 @@ public class CloudFrontService {
         try {
             // Implementation for getting CloudFront distribution statistics
             // This could be used for monitoring CDN performance
-            
+
             log.debug("Retrieved CloudFront distribution statistics");
-            
+
         } catch (Exception e) {
             log.error("Error getting CloudFront distribution stats", e);
         }
     }
-} 
+}

@@ -75,6 +75,12 @@ rabbitmq:
     key:
       encoding: ${RABBITMQ_ROUTING_KEY_ENCODING:video.encoding}
 
+# Multipart Upload Cleanup Configuration
+multipart:
+  cleanup:
+    enabled: ${MULTIPART_CLEANUP_ENABLED:true}
+    max-age-hours: ${MULTIPART_CLEANUP_MAX_AGE_HOURS:24}
+
 # Management endpoints
 management:
   endpoints:

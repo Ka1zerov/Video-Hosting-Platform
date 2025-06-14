@@ -77,7 +77,7 @@ This project was developed as part of my Master's thesis, implementing a microse
 ### Core Services
 - **🌐 Gateway** (`gateway/`) - API Gateway with authentication and CORS handling
 - **🔐 Authentication** (`authentication/`) - User authentication and authorization  
-- **📤 Upload Service** (`upload/`) - Video file upload and storage (S3)
+- **📤 Upload Service** (`upload/`) - Video file upload and storage (S3) with enterprise reliability features
 - **📊 Metadata Service** (`metadata/`) - Video metadata, search, analytics, and user interactions
 
 ### Video Processing Services
@@ -137,6 +137,7 @@ cd infrastructure
 - **RabbitMQ UI**: http://localhost:15672 (guest/guest)
 - **Video DB Admin**: http://localhost:5051 (admin@video.local/admin)
 - **Redis Commander**: http://localhost:8081
+- **Upload Service Admin**: http://localhost:8082/api/upload/multipart/admin/cleanup-stats
 
 ## 🏭 Infrastructure
 
@@ -151,6 +152,7 @@ cd infrastructure
 - **Shared Video Database**: Upload and Metadata services share video_platform DB with Liquibase contexts
 - **Service Profiles**: Start only needed infrastructure components
 - **Admin Tools**: Optional database and cache management interfaces
+- **Automatic Cleanup**: Upload service includes automated cleanup of expired sessions and S3 resources
 
 For detailed infrastructure documentation, see [`infrastructure/README.md`](infrastructure/README.md).
 
@@ -262,7 +264,7 @@ Each service has its own detailed README:
 
 - [Infrastructure Setup](infrastructure/README.md) - Shared infrastructure management
 - [RabbitMQ Message Broker](infrastructure/RABBITMQ.md) - Asynchronous communication and event flow
-- [Upload Service](upload/README.md) - Video file upload and S3 storage
+- [Upload Service](upload/README.md) - Video file upload, S3 storage, multipart uploads, and reliability features
 - [Metadata Service](metadata/README.md) - Video metadata, search, and analytics
 - Gateway Service - API gateway and routing
 - Authentication Service - User management and JWT

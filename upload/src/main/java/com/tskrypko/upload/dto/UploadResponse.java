@@ -1,9 +1,19 @@
 package com.tskrypko.upload.dto;
 
+import com.tskrypko.upload.model.Video;
 import com.tskrypko.upload.model.VideoStatus;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Setter
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
 public class UploadResponse {
 
     private UUID id;
@@ -15,82 +25,15 @@ public class UploadResponse {
     private LocalDateTime uploadedAt;
     private String message;
 
-    public UploadResponse() {}
-
-    public UploadResponse(UUID id, String title, String description, String originalFilename, 
-                         Long fileSize, VideoStatus status, LocalDateTime uploadedAt, String message) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
-        this.originalFilename = originalFilename;
-        this.fileSize = fileSize;
-        this.status = status;
-        this.uploadedAt = uploadedAt;
-        this.message = message;
-    }
-
-    // Геттеры и сеттеры
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getOriginalFilename() {
-        return originalFilename;
-    }
-
-    public void setOriginalFilename(String originalFilename) {
-        this.originalFilename = originalFilename;
-    }
-
-    public Long getFileSize() {
-        return fileSize;
-    }
-
-    public void setFileSize(Long fileSize) {
-        this.fileSize = fileSize;
-    }
-
-    public VideoStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(VideoStatus status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getUploadedAt() {
-        return uploadedAt;
-    }
-
-    public void setUploadedAt(LocalDateTime uploadedAt) {
-        this.uploadedAt = uploadedAt;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
+    // Constructor from Video model
+    public UploadResponse(Video video, String message) {
+        this.id = video.getId();
+        this.title = video.getTitle();
+        this.description = video.getDescription();
+        this.originalFilename = video.getOriginalFilename();
+        this.fileSize = video.getFileSize();
+        this.status = video.getStatus();
+        this.uploadedAt = video.getUploadedAt();
         this.message = message;
     }
 
