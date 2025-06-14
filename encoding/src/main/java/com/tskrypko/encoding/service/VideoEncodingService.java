@@ -3,7 +3,6 @@ package com.tskrypko.encoding.service;
 import com.tskrypko.encoding.model.EncodingJob;
 import com.tskrypko.encoding.model.EncodingStatus;
 import com.tskrypko.encoding.model.VideoQuality;
-import com.tskrypko.encoding.model.Video;
 import com.tskrypko.encoding.model.VideoStatus;
 import com.tskrypko.encoding.repository.EncodingJobRepository;
 import com.tskrypko.encoding.repository.VideoRepository;
@@ -50,10 +49,10 @@ public class VideoEncodingService {
 
     /**
      * Processes a video encoding job asynchronously.
-     * 
-     * <p>This method is used in production to handle video encoding without blocking 
+     *
+     * <p>This method is used in production to handle video encoding without blocking
      * the calling thread. The actual processing is delegated to {@link #processEncodingJobSync(String)}.
-     * 
+     *
      * @param jobId the UUID string of the encoding job to process
      * @see #processEncodingJobSync(String) for synchronous processing (used in tests)
      */
@@ -64,7 +63,7 @@ public class VideoEncodingService {
 
     /**
      * Processes a video encoding job synchronously.
-     * 
+     *
      * <p>This method performs the complete video encoding workflow:
      * <ol>
      *   <li>Downloads the original video from S3</li>
@@ -74,17 +73,17 @@ public class VideoEncodingService {
      *   <li>Uploads all encoded content back to S3</li>
      *   <li>Updates job status and optionally cleans up temporary files</li>
      * </ol>
-     * 
+     *
      * <p><strong>Usage in different environments:</strong>
      * <ul>
      *   <li><strong>Production</strong>: Called via {@link #processEncodingJob(String)} for async processing</li>
-     *   <li><strong>Testing</strong>: Called directly to ensure synchronous execution and prevent 
+     *   <li><strong>Testing</strong>: Called directly to ensure synchronous execution and prevent
      *       race conditions with TestContainers lifecycle</li>
      * </ul>
-     * 
-     * <p><strong>Error handling:</strong> If any step fails, the job status is set to FAILED 
+     *
+     * <p><strong>Error handling:</strong> If any step fails, the job status is set to FAILED
      * and temporary files are cleaned up (if cleanup is enabled).
-     * 
+     *
      * @param jobId the UUID string of the encoding job to process
      * @throws IllegalArgumentException if the job with given ID is not found
      * @see #processEncodingJob(String) for asynchronous version
@@ -99,9 +98,9 @@ public class VideoEncodingService {
 
             // Update encoding job status
             updateJobStatus(job, EncodingStatus.PROCESSING, LocalDateTime.now(), null);
-            
+
             // Update video status to PROCESSING
-            updateVideoStatus(UUID.fromString(job.getVideoId()), VideoStatus.PROCESSING);
+            updateVideoStatus(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.PROCESSING);
 
             String localInputFile = downloadVideoFromS3(job);
             long videoDurationNs = getVideoDurationNs(localInputFile);
@@ -116,17 +115,17 @@ public class VideoEncodingService {
             generateThumbnails(job, localInputFile);
 
             // Build URLs for the encoded content
-            String thumbnailUrl = buildThumbnailUrl(job.getVideoId());
-            String hlsManifestUrl = buildHlsManifestUrl(job.getVideoId());
+            String thumbnailUrl = buildThumbnailUrl(String.valueOf(job.getVideoId()));
+            String hlsManifestUrl = buildHlsManifestUrl(String.valueOf(job.getVideoId()));
 
             // Update encoding job status
             updateJobStatus(job, EncodingStatus.COMPLETED, null, LocalDateTime.now());
-            
+
             // Update video status to READY with additional info
-            updateVideoAfterEncoding(UUID.fromString(job.getVideoId()), 
-                                   VideoStatus.READY, 
-                                   durationSeconds, 
-                                   thumbnailUrl, 
+            updateVideoAfterEncoding(UUID.fromString(String.valueOf(job.getVideoId())),
+                                   VideoStatus.READY,
+                                   durationSeconds,
+                                   thumbnailUrl,
                                    hlsManifestUrl);
 
             if (cleanupEnabled) {
@@ -310,9 +309,9 @@ public class VideoEncodingService {
                     }
                     return null;
                 });
-                
+
                 // Update video status to FAILED
-                updateVideoStatus(UUID.fromString(job.getVideoId()), VideoStatus.FAILED);
+                updateVideoStatus(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.FAILED);
             }
         } catch (Exception e) {
             logger.error("Error handling job error for {}: {}", jobId, e.getMessage(), e);
@@ -346,11 +345,11 @@ public class VideoEncodingService {
     }
 
     @Transactional
-    protected void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration, 
+    protected void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration,
                                            String thumbnailUrl, String hlsManifestUrl) {
         try {
             videoRepository.updateVideoAfterEncoding(videoId, status, duration, thumbnailUrl, hlsManifestUrl);
-            logger.info("Updated video after encoding: videoId={}, status={}, duration={}", 
+            logger.info("Updated video after encoding: videoId={}, status={}, duration={}",
                        videoId, status, duration);
         } catch (Exception e) {
             logger.error("Failed to update video after encoding: videoId={}", videoId, e);
@@ -359,17 +358,17 @@ public class VideoEncodingService {
 
     private String buildThumbnailUrl(String videoId) {
         // Build S3 URL for thumbnail
-        return String.format("https://%s.s3.%s.amazonaws.com/thumbnails/%s/thumbnail_720p.jpg", 
-                           System.getenv("S3_BUCKET_NAME"), 
-                           System.getenv("AWS_REGION"), 
+        return String.format("https://%s.s3.%s.amazonaws.com/thumbnails/%s/thumbnail_720p.jpg",
+                           System.getenv("S3_BUCKET_NAME"),
+                           System.getenv("AWS_REGION"),
                            videoId);
     }
 
     private String buildHlsManifestUrl(String videoId) {
         // Build S3 URL for HLS master playlist
-        return String.format("https://%s.s3.%s.amazonaws.com/encoded/%s/master.m3u8", 
-                           System.getenv("S3_BUCKET_NAME"), 
-                           System.getenv("AWS_REGION"), 
+        return String.format("https://%s.s3.%s.amazonaws.com/encoded/%s/master.m3u8",
+                           System.getenv("S3_BUCKET_NAME"),
+                           System.getenv("AWS_REGION"),
                            videoId);
     }
 }

@@ -8,7 +8,6 @@ import com.tskrypko.authentication.config.security.token.RefreshTokenCookieAuthe
 import com.tskrypko.authentication.service.CustomOidcUserService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -42,9 +41,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.logout.CookieClearingLogoutHandler;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -72,7 +68,7 @@ public class SecurityConfig {
         http
                 .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(AbstractHttpConfigurer::disable)
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception.defaultAuthenticationEntryPointFor(
                         new LoginUrlAuthenticationEntryPoint("/login"),
@@ -114,7 +110,7 @@ public class SecurityConfig {
                         .httpStrictTransportSecurity(HeadersConfigurer.HstsConfig::disable)
                 )
                 .securityMatcher("/api/**")
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(AbstractHttpConfigurer::disable)
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/auth/**"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -135,7 +131,7 @@ public class SecurityConfig {
                                                     CustomOidcUserService oidcUserService) throws Exception {
         httpSecurity
                 .securityMatcher("/**")
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(AbstractHttpConfigurer::disable)
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/oauth2/logout"))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/authentication/main.css", "/login", "/error",
@@ -210,20 +206,5 @@ public class SecurityConfig {
                 .issuer(issuerUri)
                 .jwkSetEndpoint(jwkSetEndpoint)
                 .build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-                "https://app.workout-app.online",
-                "http://localhost:3*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
     }
 }
