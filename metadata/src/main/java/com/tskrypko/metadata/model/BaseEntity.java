@@ -7,12 +7,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -24,32 +23,26 @@ public abstract class BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    protected UUID id;
+    private UUID id;
 
-    @Column(updatable = false, nullable = false)
     @CreatedDate
-    protected LocalDateTime createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(nullable = false)
     @LastModifiedDate
-    protected LocalDateTime modifiedAt;
+    @Column(name = "modified_at", nullable = false)
+    private LocalDateTime modifiedAt;
 
-    @Column(updatable = false, nullable = false)
-    @CreatedBy
-    protected String createdBy;
-
-    @Column(nullable = false)
-    @LastModifiedBy
-    protected String modifiedBy;
-
-    @Column(name = "deleted_at")
-    protected LocalDateTime deletedAt;
-
-    public boolean isDeleted() {
-        return deletedAt != null;
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        BaseEntity that = (BaseEntity) obj;
+        return Objects.equals(id, that.id);
     }
 
-    public void markAsDeleted() {
-        this.deletedAt = LocalDateTime.now();
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 } 
