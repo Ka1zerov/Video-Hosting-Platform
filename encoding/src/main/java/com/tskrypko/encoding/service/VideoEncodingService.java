@@ -99,8 +99,8 @@ public class VideoEncodingService {
             // Update encoding job status
             updateJobStatus(job, EncodingStatus.PROCESSING, LocalDateTime.now(), null);
 
-            // Update video status to PROCESSING
-            updateVideoStatus(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.PROCESSING);
+            // Update video status to PROCESSING using TransactionTemplate
+            updateVideoStatusTransactional(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.PROCESSING);
 
             String localInputFile = downloadVideoFromS3(job);
             long videoDurationNs = getVideoDurationNs(localInputFile);
@@ -121,12 +121,12 @@ public class VideoEncodingService {
             // Update encoding job status
             updateJobStatus(job, EncodingStatus.COMPLETED, null, LocalDateTime.now());
 
-            // Update video status to READY with additional info
-            updateVideoAfterEncoding(UUID.fromString(String.valueOf(job.getVideoId())),
-                                   VideoStatus.READY,
-                                   durationSeconds,
-                                   thumbnailUrl,
-                                   hlsManifestUrl);
+            // Update video status to READY with additional info using TransactionTemplate
+            updateVideoAfterEncodingTransactional(UUID.fromString(String.valueOf(job.getVideoId())),
+                                                VideoStatus.READY,
+                                                durationSeconds,
+                                                thumbnailUrl,
+                                                hlsManifestUrl);
 
             if (cleanupEnabled) {
                 cleanupTempFiles(job);
@@ -266,7 +266,12 @@ public class VideoEncodingService {
         Path tempPath = Paths.get(tempDirectory, job.getId().toString());
         if (Files.exists(tempPath)) {
             try (var walk = Files.walk(tempPath)) {
-                walk.map(Path::toFile).forEach(File::delete);
+                walk.map(Path::toFile)
+                    .forEach(file -> {
+                        if (file.isFile() && !file.delete()) {
+                            logger.warn("Failed to delete file: {}", file.getAbsolutePath());
+                        }
+                    });
             } catch (IOException e) {
                 logger.warn("Failed to cleanup temp files for job {}: {}", job.getId(), e.getMessage());
             }
@@ -310,8 +315,8 @@ public class VideoEncodingService {
                     return null;
                 });
 
-                // Update video status to FAILED
-                updateVideoStatus(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.FAILED);
+                // Update video status to FAILED using TransactionTemplate
+                updateVideoStatusTransactional(UUID.fromString(String.valueOf(job.getVideoId())), VideoStatus.FAILED);
             }
         } catch (Exception e) {
             logger.error("Error handling job error for {}: {}", jobId, e.getMessage(), e);
@@ -334,25 +339,71 @@ public class VideoEncodingService {
                 .orElseThrow(() -> new IllegalArgumentException("Job not found for S3 key: " + s3Key));
     }
 
+    /**
+     * Updates video status using TransactionTemplate to avoid self-invocation issues.
+     * This method is used internally when called from other methods in the same class.
+     */
+    private void updateVideoStatusTransactional(UUID videoId, VideoStatus status) {
+        transactionTemplate.execute(tx -> {
+            try {
+                videoRepository.updateStatus(videoId, status);
+                logger.info("Updated video status: videoId={}, status={}", videoId, status);
+            } catch (Exception e) {
+                logger.error("Failed to update video status: videoId={}, status={}", videoId, status, e);
+                throw new RuntimeException("Failed to update video status", e);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Updates video after encoding using TransactionTemplate to avoid self-invocation issues.
+     * This method is used internally when called from other methods in the same class.
+     */
+    private void updateVideoAfterEncodingTransactional(UUID videoId, VideoStatus status, Long duration,
+                                                      String thumbnailUrl, String hlsManifestUrl) {
+        transactionTemplate.execute(tx -> {
+            try {
+                videoRepository.updateVideoAfterEncoding(videoId, status, duration, thumbnailUrl, hlsManifestUrl);
+                logger.info("Updated video after encoding: videoId={}, status={}, duration={}",
+                          videoId, status, duration);
+            } catch (Exception e) {
+                logger.error("Failed to update video after encoding: videoId={}", videoId, e);
+                throw new RuntimeException("Failed to update video after encoding", e);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Public method for updating video status. Can be used by external callers.
+     * Uses @Transactional since it's called from outside the class.
+     */
     @Transactional
-    protected void updateVideoStatus(UUID videoId, VideoStatus status) {
+    public void updateVideoStatus(UUID videoId, VideoStatus status) {
         try {
             videoRepository.updateStatus(videoId, status);
             logger.info("Updated video status: videoId={}, status={}", videoId, status);
         } catch (Exception e) {
             logger.error("Failed to update video status: videoId={}, status={}", videoId, status, e);
+            throw new RuntimeException("Failed to update video status", e);
         }
     }
 
+    /**
+     * Public method for updating video after encoding. Can be used by external callers.
+     * Uses @Transactional since it's called from outside the class.
+     */
     @Transactional
-    protected void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration,
-                                           String thumbnailUrl, String hlsManifestUrl) {
+    public void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration,
+                                        String thumbnailUrl, String hlsManifestUrl) {
         try {
             videoRepository.updateVideoAfterEncoding(videoId, status, duration, thumbnailUrl, hlsManifestUrl);
             logger.info("Updated video after encoding: videoId={}, status={}, duration={}",
                        videoId, status, duration);
         } catch (Exception e) {
             logger.error("Failed to update video after encoding: videoId={}", videoId, e);
+            throw new RuntimeException("Failed to update video after encoding", e);
         }
     }
 
