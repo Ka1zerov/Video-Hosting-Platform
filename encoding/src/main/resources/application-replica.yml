@@ -44,7 +44,8 @@ spring:
         format_sql: false  # Disable in production
   
   liquibase:
-    enabled: false
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
   
   # Redis configuration for production
   data:
