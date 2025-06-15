@@ -30,7 +30,7 @@ public class EncodingJobService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<EncodingJob> getJobByVideoId(String videoId) {
+    public Optional<EncodingJob> getJobByVideoId(UUID videoId) {
         return encodingJobRepository.findByVideoId(videoId);
     }
 

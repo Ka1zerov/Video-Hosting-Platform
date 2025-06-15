@@ -22,7 +22,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/upload")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class UploadController {
 

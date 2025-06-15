@@ -19,7 +19,7 @@ public interface EncodingJobRepository extends JpaRepository<EncodingJob, UUID> 
     List<EncodingJob> findByStatus(@Param("status") EncodingStatus status);
 
     @Query("SELECT j FROM EncodingJob j WHERE j.videoId = :videoId AND j.deletedAt IS NULL")
-    Optional<EncodingJob> findByVideoId(@Param("videoId") String videoId);
+    Optional<EncodingJob> findByVideoId(@Param("videoId") UUID videoId);
 
     @Query("SELECT j FROM EncodingJob j WHERE j.userId = :userId AND j.deletedAt IS NULL ORDER BY j.createdAt DESC")
     List<EncodingJob> findByUserId(@Param("userId") String userId);

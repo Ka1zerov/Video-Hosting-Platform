@@ -150,7 +150,7 @@ public class VideoEncodingService {
                 VideoQualityCompletedEvent event = new VideoQualityCompletedEvent(
                     UUID.fromString(String.valueOf(job.getVideoId())),
                     "VIDEO_QUALITIES_COMPLETED",
-                    LocalDateTime.now(),
+                    java.time.Instant.now(),
                     completedQualities
                 );
                 streamingNotificationService.notifyVideoQualitiesCompleted(event);

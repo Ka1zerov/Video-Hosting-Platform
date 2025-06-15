@@ -23,6 +23,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway:4.2.2'
+    
+    // Fix DNS resolution issues on macOS
+    implementation 'io.netty:netty-resolver-dns-native-macos:4.1.112.Final:osx-aarch_64'
+    
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

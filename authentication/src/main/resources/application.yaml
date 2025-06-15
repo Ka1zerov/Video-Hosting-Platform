@@ -55,4 +55,4 @@ google:
 
 auth:
   jwk-set-endpoint: /.well-known/jwks.json
-  issuer-uri: http://localhost:8080
+  issuer-uri: http://localhost:8081

@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,7 +18,7 @@ public class VideoQualityCompletedEvent {
     
     private UUID videoId;
     private String eventType = "VIDEO_QUALITIES_COMPLETED";
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private Instant timestamp = Instant.now();
     private List<CompletedQuality> completedQualities;
     
     @Data

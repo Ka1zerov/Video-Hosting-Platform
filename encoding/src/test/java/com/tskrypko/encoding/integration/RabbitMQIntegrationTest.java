@@ -93,7 +93,7 @@ class RabbitMQIntegrationTest extends BaseIntegrationTest {
         int waited = 0;
         int pollInterval = 500;
         while (waited < maxWaitMs) {
-            job = jobRepository.findByVideoId(videoId).orElse(null);
+            job = jobRepository.findByVideoId(UUID.fromString(videoId)).orElse(null);
             if (job != null && (job.getStatus() == EncodingStatus.COMPLETED || job.getStatus() == EncodingStatus.FAILED)) {
                 break;
             }

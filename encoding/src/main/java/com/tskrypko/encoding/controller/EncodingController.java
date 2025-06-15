@@ -35,7 +35,7 @@ public class EncodingController {
     }
 
     @GetMapping("/job/video/{videoId}")
-    public ResponseEntity<EncodingJob> getJobByVideoId(@PathVariable String videoId) {
+    public ResponseEntity<EncodingJob> getJobByVideoId(@PathVariable UUID videoId) {
         try {
             Optional<EncodingJob> job = encodingJobService.getJobByVideoId(videoId);
             return job.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());

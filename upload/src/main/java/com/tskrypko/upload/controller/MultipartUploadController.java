@@ -20,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/upload/multipart")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class MultipartUploadController {
 

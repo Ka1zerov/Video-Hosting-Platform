@@ -41,7 +41,7 @@ public class VideoMessageListener {
             String mimeType = messageNode.has("mimeType") ? messageNode.get("mimeType").asText() : null;
 
             // Check if job already exists
-            if (encodingJobRepository.findByVideoId(videoId).isPresent()) {
+            if (encodingJobRepository.findByVideoId(UUID.fromString(videoId)).isPresent()) {
                 logger.warn("Encoding job already exists for video: {}", videoId);
                 return;
             }

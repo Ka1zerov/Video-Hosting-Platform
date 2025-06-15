@@ -2,15 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import HomePage from './pages/HomePage';
+import UploadPage from './pages/UploadPage';
+import DebugPage from './pages/DebugPage';
 
 // Placeholder components for future pages
-const UploadPage = () => (
-  <div style={{ padding: '40px', textAlign: 'center' }}>
-    <h1 style={{ color: '#d32f2f' }}>Upload Video</h1>
-    <p style={{ color: '#666' }}>Video upload functionality will be implemented here.</p>
-  </div>
-);
-
 const VideosPage = () => (
   <div style={{ padding: '40px', textAlign: 'center' }}>
     <h1 style={{ color: '#d32f2f' }}>All Videos</h1>
@@ -41,7 +36,13 @@ function App() {
         backgroundColor: '#fafafa'
       }}>
         <Routes>
-          {/* All routes are protected and require authentication */}
+          {/* Debug route - not protected for testing */}
+          <Route 
+            path="/debug" 
+            element={<DebugPage />} 
+          />
+          
+          {/* All other routes are protected and require authentication */}
           <Route 
             path="/" 
             element={
