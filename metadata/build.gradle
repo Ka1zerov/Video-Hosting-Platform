@@ -28,7 +28,9 @@ dependencies {
     implementation 'org.liquibase:liquibase-core'
     implementation 'org.postgresql:postgresql:42.7.3'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
     implementation 'org.projectlombok:lombok'
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch:3.4.5'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

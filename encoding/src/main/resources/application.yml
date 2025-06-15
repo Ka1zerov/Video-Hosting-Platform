@@ -49,10 +49,10 @@ aws:
     key: ${AWS_ACCESS_KEY:your-access-key}
   secret:
     key: ${AWS_SECRET_KEY:your-secret-key}
-  region: ${AWS_REGION:us-east-1}
+  region: ${AWS_REGION:eu-north-1}
   s3:
     bucket:
-      name: ${S3_BUCKET_NAME:video-hosting-platform-bucket}
+      name: ${S3_BUCKET_NAME:video-hosting-thesis}
 
 # RabbitMQ Configuration
 rabbitmq:
