@@ -198,8 +198,23 @@ public class VideoStreamingService {
         option.setWidth(quality.getWidth());
         option.setHeight(quality.getHeight());
         option.setBitrate(quality.getBitrate());
-        option.setHlsPlaylistUrl(quality.getHlsPlaylistUrl());
+        
+        // Use CDN URL if CloudFront is enabled, otherwise use original URL
+        String hlsPlaylistUrl = quality.getHlsPlaylistUrl();
+        if (cloudFrontService.isEnabled() && hlsPlaylistUrl != null) {
+            hlsPlaylistUrl = cloudFrontService.getCdnUrl(hlsPlaylistUrl);
+        }
+        option.setHlsPlaylistUrl(hlsPlaylistUrl);
+        
         option.setAvailable(quality.getEncodingStatus() == EncodingStatus.COMPLETED);
+        
+        log.debug("Mapped quality option: {} ({}x{}) - available: {}, playlist: {}", 
+                quality.getQualityName(), 
+                quality.getWidth(), 
+                quality.getHeight(), 
+                option.getAvailable(),
+                hlsPlaylistUrl != null ? "present" : "missing");
+        
         return option;
     }
 

@@ -1,5 +1,6 @@
 package com.tskrypko.encoding.service;
 
+import com.tskrypko.encoding.dto.VideoQualityCompletedEvent;
 import com.tskrypko.encoding.model.EncodingJob;
 import com.tskrypko.encoding.model.EncodingStatus;
 import com.tskrypko.encoding.model.VideoQuality;
@@ -24,6 +25,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -37,6 +40,7 @@ public class VideoEncodingService {
     private final FFmpegService ffmpegService;
     private final TransactionTemplate transactionTemplate;
     private final VideoRepository videoRepository;
+    private final StreamingNotificationService streamingNotificationService;
 
     @Value("${encoding.temp.directory:/tmp/encoding}")
     private String tempDirectory;
@@ -46,6 +50,12 @@ public class VideoEncodingService {
 
     @Value("${encoding.cleanup.enabled:true}")
     private boolean cleanupEnabled;
+
+    @Value("${aws.s3.bucket.name}")
+    private String s3BucketName;
+
+    @Value("${aws.region}")
+    private String awsRegion;
 
     /**
      * Processes a video encoding job asynchronously.
@@ -72,6 +82,7 @@ public class VideoEncodingService {
      *   <li>Creates thumbnails for each quality</li>
      *   <li>Uploads all encoded content back to S3</li>
      *   <li>Updates job status and optionally cleans up temporary files</li>
+     *   <li>Notifies streaming service about completed qualities</li>
      * </ol>
      *
      * <p><strong>Usage in different environments:</strong>
@@ -106,9 +117,15 @@ public class VideoEncodingService {
             long videoDurationNs = getVideoDurationNs(localInputFile);
             Long durationSeconds = videoDurationNs > 0 ? videoDurationNs / 1_000_000_000L : null;
 
+            // Track completed qualities for streaming service notification
+            List<VideoQualityCompletedEvent.CompletedQuality> completedQualities = new ArrayList<>();
+
             // Process each quality
             for (VideoQuality quality : VideoQuality.values()) {
-                processQuality(job, localInputFile, quality, videoDurationNs);
+                VideoQualityCompletedEvent.CompletedQuality completedQuality = processQuality(job, localInputFile, quality, videoDurationNs);
+                if (completedQuality != null) {
+                    completedQualities.add(completedQuality);
+                }
             }
 
             // Generate thumbnails
@@ -128,6 +145,17 @@ public class VideoEncodingService {
                                                 thumbnailUrl,
                                                 hlsManifestUrl);
 
+            // Notify streaming service about completed qualities
+            if (!completedQualities.isEmpty()) {
+                VideoQualityCompletedEvent event = new VideoQualityCompletedEvent(
+                    UUID.fromString(String.valueOf(job.getVideoId())),
+                    "VIDEO_QUALITIES_COMPLETED",
+                    LocalDateTime.now(),
+                    completedQualities
+                );
+                streamingNotificationService.notifyVideoQualitiesCompleted(event);
+            }
+
             if (cleanupEnabled) {
                 cleanupTempFiles(job);
             }
@@ -140,7 +168,7 @@ public class VideoEncodingService {
         }
     }
 
-    private void processQuality(EncodingJob job, String inputFile, VideoQuality quality, long videoDurationNs) throws IOException {
+    private VideoQualityCompletedEvent.CompletedQuality processQuality(EncodingJob job, String inputFile, VideoQuality quality, long videoDurationNs) throws IOException {
         logger.info("Encoding {} quality for job {}", quality.getLabel(), job.getId());
 
         String outputDir = createOutputDirectory(job, quality);
@@ -176,8 +204,8 @@ public class VideoEncodingService {
 
         ffmpegJob.run();
 
-        // Upload encoded files to S3
-        uploadQualityToS3(job, outputDir, quality);
+        // Upload encoded files to S3 and get info for streaming service
+        return uploadQualityToS3(job, outputDir, quality);
     }
 
     private void generateThumbnails(EncodingJob job, String inputFile) throws IOException {
@@ -232,19 +260,35 @@ public class VideoEncodingService {
         return thumbnailPath.toString();
     }
 
-    private void uploadQualityToS3(EncodingJob job, String outputDir, VideoQuality quality) throws IOException {
+    private VideoQualityCompletedEvent.CompletedQuality uploadQualityToS3(EncodingJob job, String outputDir, VideoQuality quality) throws IOException {
         String s3Prefix = "encoded/" + job.getVideoId() + "/" + quality.getFolder() + "/";
-
+        String playlistS3Key = s3Prefix + "playlist.m3u8";
+        String hlsPlaylistUrl = buildS3Url(playlistS3Key);
+        
         File dir = new File(outputDir);
         File[] files = dir.listFiles();
+        long totalFileSize = 0;
 
         if (files != null) {
             for (File file : files) {
                 String s3Key = s3Prefix + file.getName();
                 s3Service.uploadFile(file.getAbsolutePath(), s3Key);
+                totalFileSize += file.length();
                 logger.info("Uploaded {} to S3: {}", file.getName(), s3Key);
             }
         }
+
+        // Return completed quality info for streaming service
+        return new VideoQualityCompletedEvent.CompletedQuality(
+            quality.getLabel(),
+            quality.getWidth(),
+            quality.getHeight(),
+            quality.getBitrateKbps(),
+            hlsPlaylistUrl,
+            playlistS3Key,
+            totalFileSize,
+            "COMPLETED"
+        );
     }
 
     private void uploadThumbnailsToS3(EncodingJob job, String thumbnailDir) throws IOException {
@@ -421,5 +465,13 @@ public class VideoEncodingService {
                            System.getenv("S3_BUCKET_NAME"),
                            System.getenv("AWS_REGION"),
                            videoId);
+    }
+
+    private String buildS3Url(String s3Key) {
+        // Build S3 URL for streaming service
+        return String.format("https://%s.s3.%s.amazonaws.com/%s",
+                           System.getenv("S3_BUCKET_NAME"),
+                           System.getenv("AWS_REGION"),
+                           s3Key);
     }
 }
