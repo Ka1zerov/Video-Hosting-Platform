@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: Gym App Gateway Service
+    name: Video Platform Gateway Service
 
   cloud:
     gateway:
@@ -20,10 +20,24 @@ spring:
           filters:
             - name: JwtHeaderFilter
 
-        - id: streaming-service
+        - id: metadata-service
           uri: http://localhost:8083
           predicates:
+            - Path=/api/metadata/**
+          filters:
+            - name: JwtHeaderFilter
+
+        - id: streaming-service
+          uri: http://localhost:8084
+          predicates:
             - Path=/api/streaming/**
+          filters:
+            - name: JwtHeaderFilter
+
+        - id: encoding-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/encoding/**
           filters:
             - name: JwtHeaderFilter
 
@@ -41,6 +55,7 @@ management:
         include:
           - health
           - refresh
+          - gateway
   endpoint:
     gateway:
       enabled: true

@@ -78,11 +78,6 @@ Frontend ──► MultipartController ──► MultipartService ──► S3
     └─── Progress ←┘
 ```
 
-### 📚 **Documentation**
-
-For detailed multipart upload usage, examples, and integration guide, see:
-**[MULTIPART_UPLOAD.md](MULTIPART_UPLOAD.md)**
-
 ## 🔒 **Reliability & Data Consistency**
 
 ### **Transaction-Safe Message Publishing**

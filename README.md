@@ -33,18 +33,19 @@ This project was developed as part of my Master's thesis, implementing a microse
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘           │
 │         │                │                │                │                │                     │
 ├─────────┼────────────────┼────────────────┼────────────────┼────────────────┼─────────────────────┤
-│  SHARED INFRASTRUCTURE                                                                          │
+│  SHARED INFRASTRUCTURE & DATABASES                                                             │
 │         │                │                │                │                │                     │
-│  ┌─────────────┐  ┌───────────────────────────────────┐                                         │
-│  │ PostgreSQL  │  │     PostgreSQL Video DB           │                                         │
-│  │  Auth DB    │  │        (Shared)                   │                                         │
-│  │ Port: 5432  │  │      Port: 5433                   │                                         │
-│  │             │  │ • videos (upload service)         │                                         │
-│  │ Users       │  │ • video_metadata (metadata)       │                                         │
-│  │ Sessions    │  │ • categories, playlists           │                                         │
-│  │ Permissions │  │ • analytics, user interactions    │                                         │
-│  └─────────────┘  └───────────────────────────────────┘                                         │
-│         │                                │                                                       │
+│  ┌─────────────┐  ┌───────────────────────────────────────────────────────────────────┐         │
+│  │ PostgreSQL  │  │                 PostgreSQL Video DB (Master-Slave)               │         │
+│  │  Auth DB    │  │                          (Shared)                                │         │
+│  │ Port: 5432  │  │  Master: 5433 (writes) | Slave: 5434 (reads)                   │         │
+│  │             │  │  HAProxy: 5435 (writes) | 5436 (read load balancing)            │         │
+│  │ Users       │  │                                                                 │         │
+│  │ Sessions    │  │ • videos (upload service)                                       │         │
+│  │ Permissions │  │ • video_metadata (metadata)                                     │         │
+│  └─────────────┘  │ • categories, playlists                                         │         │
+│         │          │ • analytics, user interactions                                  │         │
+│                    └───────────────────────────────────────────────────────────────────┘         │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────┐   │
 │  │                           Redis Cache (Shared)                                         │   │
 │  │                             Port: 6379                                                 │   │
@@ -141,13 +142,31 @@ cd infrastructure
 
 ## 🏭 Infrastructure
 
-### Shared Components
+### Database Architecture
 - **PostgreSQL Auth** (5432) - Authentication database
-- **PostgreSQL Video** (5433) - Shared database for upload + metadata services
+- **PostgreSQL Video Master** (5433) - Primary database for write operations
+- **PostgreSQL Video Slave** (5434) - Read replica for read operations
+- **HAProxy Load Balancer**:
+  - **Write Port** (5435) - Routes all write operations to master
+  - **Read Port** (5436) - Load balances read operations between master and slave
+
+### Shared Components
 - **Redis** (6379) - Shared caching layer
 - **RabbitMQ** (5672) - Message broker for async communication
+- **HAProxy Stats** (8404) - Load balancer statistics dashboard
+
+### Master-Slave Replication
+The platform implements PostgreSQL streaming replication for high availability and read scalability:
+
+- **Production Mode** (`application-replica.yml`): Uses HAProxy for intelligent routing
+  - Write operations: Routed to master via port 5435
+  - Read operations: Load balanced between master and slave via port 5436
+- **Development Mode** (`application.yml`): Direct connection to master (port 5433)
 
 ### Key Features
+- **Database Replication**: Automatic data synchronization between master and slave
+- **Intelligent Load Balancing**: HAProxy routes reads/writes appropriately
+- **High Availability**: Automatic failover capabilities with replication monitoring
 - **Database Isolation**: Separate auth and video databases
 - **Shared Video Database**: Upload and Metadata services share video_platform DB with Liquibase contexts
 - **Service Profiles**: Start only needed infrastructure components
@@ -170,7 +189,8 @@ For detailed infrastructure documentation, see [`infrastructure/README.md`](infr
 
 ### Infrastructure
 - **Docker Compose** - Service orchestration
-- **HAProxy** - Load balancing (in upload service)
+- **HAProxy** - Load balancing and database replication routing
+- **PostgreSQL Streaming Replication** - High availability and read scalability
 - **Gradle** - Build automation
 
 ## 📊 Service Communication
@@ -249,6 +269,30 @@ Video-Hosting-Platform/
 2. Start services in order: upload → metadata → encoding → streaming → gateway → auth
 3. Use admin tools for debugging: `./infrastructure/scripts/platform.sh start admin`
 
+### Production Mode
+To run services with master-slave replication:
+```bash
+# Start services with replica profile for production-like environment
+cd upload && ./gradlew bootRun --args='--spring.profiles.active=replica'
+cd metadata && ./gradlew bootRun --args='--spring.profiles.active=replica'
+cd encoding && ./gradlew bootRun --args='--spring.profiles.active=replica'  
+cd streaming && ./gradlew bootRun --args='--spring.profiles.active=replica'
+```
+
+### Database Replication Management
+```bash
+cd infrastructure
+
+# Check replication status
+./scripts/platform.sh replication-status
+
+# View HAProxy statistics
+./scripts/platform.sh haproxy-stats
+
+# Emergency failover (if master fails)
+./scripts/platform.sh promote-slave
+```
+
 ### Testing
 ```bash
 # Run tests for all services
@@ -274,6 +318,44 @@ Each service has its own detailed README:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔌 Port Configuration
+
+### Microservices
+| Service        | Port | Description                  |
+|----------------|------|------------------------------|
+| Gateway        | 8080 | API Gateway (entry point)    |
+| Authentication | 8081 | Authentication service       |
+| Upload         | 8082 | Video upload service         |
+| Metadata       | 8083 | Video metadata service       |
+| Streaming      | 8084 | Video streaming service      |
+| Encoding       | 8085 | Video encoding service       |
+
+### Infrastructure
+| Component               | Port  | Description                    |
+|-------------------------|-------|--------------------------------|
+| PostgreSQL Auth         | 5432  | Authentication database        |
+| PostgreSQL Master       | 5433  | Primary database (writes)      |
+| PostgreSQL Slave        | 5434  | Read replica database          |
+| HAProxy Write           | 5435  | Load balancer (writes)         |
+| HAProxy Read            | 5436  | Load balancer (reads)          |
+| Redis                   | 6379  | Cache and sessions             |
+| RabbitMQ                | 5672  | Message broker                 |
+| RabbitMQ Management     | 15672 | RabbitMQ web interface         |
+| HAProxy Statistics      | 8404  | HAProxy monitoring dashboard   |
+
+### Gateway Routing
+- `/api/auth/**` → Authentication (8081)
+- `/api/upload/**` → Upload (8082)
+- `/api/metadata/**` → Metadata (8083)
+- `/api/streaming/**` → Streaming (8084)
+- `/api/encoding/**` → Encoding (8085)
+
+### Recent Fixes
+- ✅ Encoding service port changed from 8083 → 8085 (resolved conflict with metadata)
+- ✅ Gateway routing updated to include metadata and encoding services
+- ✅ Database credentials unified across all video services
+- ✅ Master-slave PostgreSQL replication implemented with HAProxy load balancing
 
 ---
 

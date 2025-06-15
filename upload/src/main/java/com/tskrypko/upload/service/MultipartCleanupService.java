@@ -7,6 +7,7 @@ import com.amazonaws.services.s3.model.MultipartUpload;
 import com.amazonaws.services.s3.model.MultipartUploadListing;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tskrypko.upload.model.MultipartUploadSession;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,12 +55,12 @@ public class MultipartCleanupService {
         }
 
         logger.info("Starting multipart cleanup process");
-        
+
         try {
             int cleanedRedis = cleanupExpiredRedisSessions();
             int cleanedS3 = cleanupExpiredS3Uploads();
-            
-            logger.info("Multipart cleanup completed: {} Redis sessions, {} S3 uploads", 
+
+            logger.info("Multipart cleanup completed: {} Redis sessions, {} S3 uploads",
                        cleanedRedis, cleanedS3);
         } catch (Exception e) {
             logger.error("Error during multipart cleanup process", e);
@@ -72,7 +73,7 @@ public class MultipartCleanupService {
     private int cleanupExpiredRedisSessions() {
         try {
             Set<String> sessionKeys = redisTemplate.keys("multipart:session:*");
-            if (sessionKeys == null || sessionKeys.isEmpty()) {
+            if (sessionKeys.isEmpty()) {
                 return 0;
             }
 
@@ -87,19 +88,19 @@ public class MultipartCleanupService {
                     }
 
                     MultipartUploadSession session = objectMapper.readValue(sessionJson, MultipartUploadSession.class);
-                    
+
                     if (session.getExpiresAt() != null && session.getExpiresAt().isBefore(now)) {
                         // Session expired, clean it up
                         String uploadId = key.replace("multipart:session:", "");
-                        
+
                         // Abort S3 multipart upload
                         abortS3MultipartUpload(session.getS3Key(), uploadId);
-                        
+
                         // Remove from Redis
                         redisTemplate.delete(key);
-                        
+
                         cleaned++;
-                        logger.info("Cleaned expired session: uploadId={}, s3Key={}", 
+                        logger.info("Cleaned expired session: uploadId={}, s3Key={}",
                                    uploadId, session.getS3Key());
                     }
                 } catch (Exception e) {
@@ -121,7 +122,7 @@ public class MultipartCleanupService {
         try {
             ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName);
             MultipartUploadListing listing = amazonS3.listMultipartUploads(request);
-            
+
             int cleaned = 0;
             Date cutoffDate = new Date(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(maxAgeHours));
 
@@ -130,11 +131,11 @@ public class MultipartCleanupService {
                     try {
                         abortS3MultipartUpload(upload.getKey(), upload.getUploadId());
                         cleaned++;
-                        logger.info("Cleaned expired S3 multipart upload: key={}, uploadId={}, age={}h", 
-                                   upload.getKey(), upload.getUploadId(), 
+                        logger.info("Cleaned expired S3 multipart upload: key={}, uploadId={}, age={}h",
+                                   upload.getKey(), upload.getUploadId(),
                                    TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis() - upload.getInitiated().getTime()));
                     } catch (Exception e) {
-                        logger.warn("Failed to abort S3 multipart upload: key={}, uploadId={}, error={}", 
+                        logger.warn("Failed to abort S3 multipart upload: key={}, uploadId={}, error={}",
                                    upload.getKey(), upload.getUploadId(), e.getMessage());
                     }
                 }
@@ -154,12 +155,12 @@ public class MultipartCleanupService {
         try {
             String sessionKey = "multipart:session:" + uploadId;
             String sessionJson = redisTemplate.opsForValue().get(sessionKey);
-            
+
             if (sessionJson != null) {
                 MultipartUploadSession session = objectMapper.readValue(sessionJson, MultipartUploadSession.class);
                 abortS3MultipartUpload(session.getS3Key(), uploadId);
                 redisTemplate.delete(sessionKey);
-                
+
                 logger.info("Manually cleaned session: uploadId={}, s3Key={}", uploadId, session.getS3Key());
                 return true;
             }
@@ -176,7 +177,7 @@ public class MultipartCleanupService {
         try {
             String sessionKey = "multipart:session:" + uploadId;
             String sessionJson = redisTemplate.opsForValue().get(sessionKey);
-            
+
             if (sessionJson == null) {
                 return true; // Session doesn't exist
             }
@@ -195,12 +196,12 @@ public class MultipartCleanupService {
     public CleanupStats getCleanupStats() {
         try {
             Set<String> sessionKeys = redisTemplate.keys("multipart:session:*");
-            int totalSessions = sessionKeys != null ? sessionKeys.size() : 0;
-            
+            int totalSessions = sessionKeys.size();
+
             ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName);
             MultipartUploadListing listing = amazonS3.listMultipartUploads(request);
             int totalS3Uploads = listing.getMultipartUploads().size();
-            
+
             return new CleanupStats(totalSessions, totalS3Uploads, maxAgeHours, cleanupEnabled);
         } catch (Exception e) {
             logger.error("Error getting cleanup stats", e);
@@ -213,7 +214,7 @@ public class MultipartCleanupService {
             AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, s3Key, uploadId);
             amazonS3.abortMultipartUpload(abortRequest);
         } catch (Exception e) {
-            logger.warn("Failed to abort S3 multipart upload: key={}, uploadId={}, error={}", 
+            logger.warn("Failed to abort S3 multipart upload: key={}, uploadId={}, error={}",
                        s3Key, uploadId, e.getMessage());
         }
     }
@@ -221,6 +222,7 @@ public class MultipartCleanupService {
     /**
      * Statistics for cleanup operations
      */
+    @Getter
     public static class CleanupStats {
         private final int totalRedisSessions;
         private final int totalS3Uploads;
@@ -234,9 +236,5 @@ public class MultipartCleanupService {
             this.cleanupEnabled = cleanupEnabled;
         }
 
-        public int getTotalRedisSessions() { return totalRedisSessions; }
-        public int getTotalS3Uploads() { return totalS3Uploads; }
-        public int getMaxAgeHours() { return maxAgeHours; }
-        public boolean isCleanupEnabled() { return cleanupEnabled; }
     }
-} 
+}

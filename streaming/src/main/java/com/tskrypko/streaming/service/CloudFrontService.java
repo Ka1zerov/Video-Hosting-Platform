@@ -159,22 +159,4 @@ public class CloudFrontService {
         }
     }
 
-    /**
-     * Get CDN distribution statistics (if needed for monitoring)
-     */
-    public void getDistributionStats() {
-        if (!isEnabled()) {
-            return;
-        }
-
-        try {
-            // Implementation for getting CloudFront distribution statistics
-            // This could be used for monitoring CDN performance
-
-            log.debug("Retrieved CloudFront distribution statistics");
-
-        } catch (Exception e) {
-            log.error("Error getting CloudFront distribution stats", e);
-        }
-    }
 }

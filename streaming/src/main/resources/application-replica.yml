@@ -1,3 +1,5 @@
+# Production configuration with database replication
+
 server:
   port: 8084
 
@@ -5,28 +7,48 @@ spring:
   application:
     name: streaming-service
   
+  # Write operations - HAProxy routes to Master
   datasource:
-    url: jdbc:postgresql://localhost:5433/video_platform
+    url: jdbc:postgresql://localhost:5435/video_platform
     username: ${DB_USERNAME:upload_user}
     password: ${DB_PASSWORD:upload_pass}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      validation-timeout: 5000
+
+  # Read-only operations - HAProxy routes to Master + Slave
+  datasource-readonly:
+    url: jdbc:postgresql://localhost:5436/video_platform
+    username: ${DB_USERNAME:upload_user}
+    password: ${DB_PASSWORD:upload_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      validation-timeout: 5000
   
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
+    show-sql: false  # Disable in production
     open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false  # Disable in production
   
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     enabled: true
     contexts: streaming-service
   
-  # Redis configuration for caching and session storage
+  # Redis configuration for production
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -35,9 +57,9 @@ spring:
       timeout: 5000ms
       lettuce:
         pool:
-          max-active: 10
-          max-idle: 5
-          min-idle: 2
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
   
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -49,17 +71,17 @@ spring:
 # AWS Configuration
 aws:
   access:
-    key: ${AWS_ACCESS_KEY:your-access-key}
+    key: ${AWS_ACCESS_KEY}
   secret:
-    key: ${AWS_SECRET_KEY:your-secret-key}
+    key: ${AWS_SECRET_KEY}
   region: ${AWS_REGION:us-east-1}
   s3:
     bucket:
-      name: ${S3_BUCKET_NAME:video-hosting-platform-bucket}
+      name: ${S3_BUCKET_NAME}
       prefix: ${S3_BUCKET_PREFIX:videos/}
   cloudfront:
     domain: ${CLOUDFRONT_DOMAIN:}
-    enabled: ${CLOUDFRONT_ENABLED:false}
+    enabled: ${CLOUDFRONT_ENABLED:true}
 
 # Streaming Configuration
 streaming:
@@ -92,15 +114,15 @@ streaming:
   
   # CDN Configuration
   cdn:
-    enabled: ${CDN_ENABLED:false}
+    enabled: ${CDN_ENABLED:true}
     cache-control: "public, max-age=31536000"
     manifest-cache-control: "public, max-age=60"
   
-  # Security settings (simplified - no JWT)
+  # Security settings
   security:
     rate-limit:
-      requests-per-minute: 60
-      requests-per-hour: 1000
+      requests-per-minute: 120
+      requests-per-hour: 3000
 
 # RabbitMQ Configuration
 rabbitmq:
@@ -117,25 +139,28 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: never  # Hide details in production
 
-# Logging configuration
+# Logging configuration for production
 logging:
   level:
     com.tskrypko.streaming: INFO
-    org.springframework.web: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN  # Hide SQL in production
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/streaming-service.log
+    max-size: 100MB
+    max-history: 30
 
 # Custom application properties
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://yourdomain.com}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
     allowed-headers: ${CORS_ALLOWED_HEADERS:*} 

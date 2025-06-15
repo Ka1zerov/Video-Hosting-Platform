@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tskrypko.encoding.model.EncodingJob;
 import com.tskrypko.encoding.model.EncodingStatus;
 import com.tskrypko.encoding.repository.EncodingJobRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class VideoMessageListener {
     private EncodingJob createEncodingJob(String videoId, String userId, String title,
                                         String originalFilename, String s3Key, Long fileSize, String mimeType) {
         EncodingJob job = new EncodingJob();
-        job.setVideoId(videoId);
+        job.setVideoId(UUID.fromString(videoId));
         job.setUserId(userId);
         job.setTitle(title);
         job.setOriginalFilename(originalFilename);

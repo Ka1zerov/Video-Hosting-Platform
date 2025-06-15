@@ -41,7 +41,7 @@ public class VideoUploadService extends BaseVideoService {
 
         String s3Key = null;
         Video savedVideo = null;
-        
+
         try {
             s3Key = s3Service.uploadFile(file, userId);
             logger.info("File uploaded to S3: {}", s3Key);
@@ -82,10 +82,8 @@ public class VideoUploadService extends BaseVideoService {
 
         // IMPORTANT: Send message AFTER transaction is committed
         // This prevents data inconsistency if message sending fails
-        if (savedVideo != null) {
-            sendToEncodingQueueSafely(savedVideo, "Regular");
-        }
-        
+        sendToEncodingQueueSafely(savedVideo, "Regular");
+
         // Use inherited method to create response
         return createUploadResponse(savedVideo, "Video successfully uploaded and sent for processing");
     }

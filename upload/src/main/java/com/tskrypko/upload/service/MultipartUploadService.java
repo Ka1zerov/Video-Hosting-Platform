@@ -48,7 +48,7 @@ public class MultipartUploadService extends BaseVideoService {
     private String keyPrefix;
 
     public MultipartUploadService(VideoRepository videoRepository, MessagePublisher messagePublisher,
-                                AmazonS3 amazonS3, RedisTemplate<String, String> redisTemplate, 
+                                AmazonS3 amazonS3, RedisTemplate<String, String> redisTemplate,
                                 ObjectMapper objectMapper, MultipartCleanupService cleanupService) {
         super(videoRepository, messagePublisher);
         this.amazonS3 = amazonS3;
@@ -64,7 +64,7 @@ public class MultipartUploadService extends BaseVideoService {
         logger.info("Initiating multipart upload for user {}: {}", userId, request.getTitle());
 
         // Use inherited validation for metadata
-        validateVideoMetadata(request.getTitle(), request.getDescription(), 
+        validateVideoMetadata(request.getTitle(), request.getDescription(),
                             request.getOriginalFilename(), request.getFileSize(), request.getMimeType());
 
         // Additional multipart-specific validation
@@ -125,13 +125,13 @@ public class MultipartUploadService extends BaseVideoService {
     public MultipartUploadResponse initiateMultipartUpload(MultipartUploadRequest request, String userId) {
         // Convert to unified DTO
         VideoUploadRequest unifiedRequest = new VideoUploadRequest(
-            request.getTitle(), 
+            request.getTitle(),
             request.getDescription(),
             request.getOriginalFilename(),
             request.getFileSize(),
             request.getMimeType()
         );
-        
+
         return initiateMultipartUpload(unifiedRequest, userId);
     }
 
@@ -226,7 +226,7 @@ public class MultipartUploadService extends BaseVideoService {
         }
 
         Video savedVideo = null;
-        
+
         try {
             // Prepare parts list for completion
             List<PartETag> partETags = new ArrayList<>();
@@ -254,7 +254,7 @@ public class MultipartUploadService extends BaseVideoService {
                 session.getUserId(),
                 session.getS3Key()
             );
-            
+
             savedVideo = videoRepository.save(video);
 
             // Delete session from Redis (within transaction)
@@ -280,9 +280,7 @@ public class MultipartUploadService extends BaseVideoService {
 
         // IMPORTANT: Send message AFTER transaction is committed
         // This prevents data inconsistency if message sending fails
-        if (savedVideo != null) {
-            sendToEncodingQueueSafely(savedVideo, "Multipart");
-        }
+        sendToEncodingQueueSafely(savedVideo, "Multipart");
 
         // Use inherited method to create response
         return createUploadResponse(savedVideo, "Video successfully uploaded via multipart upload");
@@ -395,4 +393,4 @@ public class MultipartUploadService extends BaseVideoService {
         String key = "multipart:session:" + uploadId; // Changed key format for cleanup service
         redisTemplate.delete(key);
     }
-} 
+}

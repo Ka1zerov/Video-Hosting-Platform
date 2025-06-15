@@ -1,3 +1,5 @@
+# Production configuration with database replication
+
 server:
   port: 8085
 
@@ -5,25 +7,46 @@ spring:
   application:
     name: encoding-service
   
+  # Write operations - HAProxy routes to Master
   datasource:
-    url: jdbc:postgresql://localhost:5433/video_platform
+    url: jdbc:postgresql://localhost:5435/video_platform
     username: ${DB_USERNAME:upload_user}
     password: ${DB_PASSWORD:upload_pass}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      validation-timeout: 5000
+
+  # Read-only operations - HAProxy routes to Master + Slave
+  datasource-readonly:
+    url: jdbc:postgresql://localhost:5436/video_platform
+    username: ${DB_USERNAME:upload_user}
+    password: ${DB_PASSWORD:upload_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      validation-timeout: 5000
   
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false  # Disable in production
     open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false  # Disable in production
   
   liquibase:
     enabled: false
   
+  # Redis configuration for production
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -32,9 +55,9 @@ spring:
       timeout: 5000ms
       lettuce:
         pool:
-          max-active: 10
-          max-idle: 5
-          min-idle: 2
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
   
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
@@ -46,13 +69,13 @@ spring:
 # AWS S3 Configuration
 aws:
   access:
-    key: ${AWS_ACCESS_KEY:your-access-key}
+    key: ${AWS_ACCESS_KEY}
   secret:
-    key: ${AWS_SECRET_KEY:your-secret-key}
+    key: ${AWS_SECRET_KEY}
   region: ${AWS_REGION:us-east-1}
   s3:
     bucket:
-      name: ${S3_BUCKET_NAME:video-hosting-platform-bucket}
+      name: ${S3_BUCKET_NAME}
 
 # RabbitMQ Configuration
 rabbitmq:
@@ -66,10 +89,10 @@ rabbitmq:
 
 # FFmpeg Configuration
 ffmpeg:
-  path: ${FFMPEG_PATH:/opt/homebrew/bin/ffmpeg}
+  path: ${FFMPEG_PATH:/usr/bin/ffmpeg}
 
 ffprobe:
-  path: ${FFPROBE_PATH:/opt/homebrew/bin/ffprobe}
+  path: ${FFPROBE_PATH:/usr/bin/ffprobe}
 
 # Encoding Configuration
 encoding:
@@ -78,6 +101,8 @@ encoding:
   hls:
     segment:
       duration: ${HLS_SEGMENT_DURATION:10}
+  concurrent:
+    jobs: ${ENCODING_CONCURRENT_JOBS:2}  # Limit concurrent encoding jobs
 
 # Management endpoints
 management:
@@ -87,15 +112,18 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: never  # Hide details in production
 
-# Logging configuration
+# Logging configuration for production
 logging:
   level:
     com.tskrypko.encoding: INFO
-    org.springframework.web: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN  # Hide SQL in production
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/encoding-service.log 
+    name: logs/encoding-service.log
+    max-size: 100MB
+    max-history: 30 

@@ -5,7 +5,9 @@ import com.tskrypko.streaming.exception.SessionAccessDeniedException;
 import com.tskrypko.streaming.model.StreamQuality;
 import com.tskrypko.streaming.model.ViewSession;
 import com.tskrypko.streaming.repository.ViewSessionRepository;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,16 +38,16 @@ public class ViewSessionService {
         log.info("Starting view session for video: {} by user: {}", videoId, userId);
 
         String sessionId = UUID.randomUUID().toString();
-        
+
         ViewSession session = new ViewSession(videoId, sessionId, ipAddress);
         session.setUserId(userId);
         session.setUserAgent(userAgent);
-        
+
         ViewSession savedSession = viewSessionRepository.save(session);
-        
+
         // Increment video view count asynchronously
         incrementVideoViewCountAsync(videoId);
-        
+
         log.debug("Started view session: {} for video: {}", sessionId, videoId);
         return savedSession;
     }
@@ -64,16 +66,16 @@ public class ViewSessionService {
                 session.setLastHeartbeat(LocalDateTime.now());
                 session.setWatchDuration(request.getWatchDuration());
                 session.setMaxPosition(request.getCurrentPosition());
-                
+
                 // Update quality if provided
                 if (request.getQuality() != null) {
                     StreamQuality quality = parseQuality(request.getQuality());
                     session.setQuality(quality);
                 }
-                
+
                 viewSessionRepository.save(session);
             }
-            
+
         } catch (Exception e) {
             log.error("Error updating view session: {}", request.getSessionId(), e);
         }
@@ -94,7 +96,7 @@ public class ViewSessionService {
                 session.setIsComplete(isComplete);
                 viewSessionRepository.save(session);
             }
-            
+
         } catch (Exception e) {
             log.error("Error ending view session: {}", sessionId, e);
         }
@@ -117,7 +119,7 @@ public class ViewSessionService {
         // TODO: Add access control - only video owner or admin can view sessions
         String currentUserId = currentUserService.getCurrentUserIdOrNull();
         log.debug("Getting sessions for video: {} by user: {}", videoId, currentUserId);
-        
+
         return viewSessionRepository.findByVideoIdOrderByStartedAtDesc(videoId, pageable);
     }
 
@@ -131,7 +133,7 @@ public class ViewSessionService {
         if (currentUserId == null || !currentUserId.equals(userId)) {
             throw new SessionAccessDeniedException("Cannot access sessions for user: " + userId);
         }
-        
+
         return viewSessionRepository.findByUserIdOrderByStartedAtDesc(userId, pageable);
     }
 
@@ -168,7 +170,7 @@ public class ViewSessionService {
         // TODO: Add admin role check when roles are implemented
         String currentUserId = currentUserService.getCurrentUserIdOrNull();
         log.debug("Getting active sessions requested by user: {}", currentUserId);
-        
+
         return viewSessionRepository.findByEndedAtIsNullOrderByLastHeartbeatDesc();
     }
 
@@ -181,15 +183,15 @@ public class ViewSessionService {
         try {
             LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(30); // 30 minutes timeout
             List<ViewSession> staleSessions = viewSessionRepository.findStaleActiveSessions(cutoffTime);
-            
+
             if (!staleSessions.isEmpty()) {
                 log.info("Found {} stale sessions to cleanup", staleSessions.size());
-                
+
                 for (ViewSession session : staleSessions) {
                     endViewSession(session.getSessionId(), false);
                 }
             }
-            
+
         } catch (Exception e) {
             log.error("Error during stale sessions cleanup", e);
         }
@@ -205,14 +207,14 @@ public class ViewSessionService {
         analytics.setTotalWatchTime(getTotalWatchTime(videoId));
         analytics.setUniqueViewers(getUniqueViewersCount(videoId));
         analytics.setCompletionRate(getCompletionRate(videoId));
-        
+
         // Get recent sessions count (last 24 hours)
         LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
         List<ViewSession> recentSessions = viewSessionRepository.findByStartedAtBetweenOrderByStartedAtDesc(
             yesterday, LocalDateTime.now()
         );
         analytics.setRecentViewsCount((long) recentSessions.size());
-        
+
         return analytics;
     }
 
@@ -235,18 +237,14 @@ public class ViewSessionService {
         if (qualityStr == null) {
             return StreamQuality.AUTO;
         }
-        
+
         try {
-            switch (qualityStr.toLowerCase()) {
-                case "480p":
-                    return StreamQuality.Q_480P;
-                case "720p":
-                    return StreamQuality.Q_720P;
-                case "1080p":
-                    return StreamQuality.Q_1080P;
-                default:
-                    return StreamQuality.AUTO;
-            }
+            return switch (qualityStr.toLowerCase()) {
+                case "480p" -> StreamQuality.Q_480P;
+                case "720p" -> StreamQuality.Q_720P;
+                case "1080p" -> StreamQuality.Q_1080P;
+                default -> StreamQuality.AUTO;
+            };
         } catch (Exception e) {
             log.warn("Invalid quality string: {}", qualityStr);
             return StreamQuality.AUTO;
@@ -256,6 +254,8 @@ public class ViewSessionService {
     /**
      * Analytics data class
      */
+    @Setter
+    @Getter
     public static class VideoAnalytics {
         private UUID videoId;
         private Long totalWatchTime;
@@ -263,20 +263,5 @@ public class ViewSessionService {
         private Double completionRate;
         private Long recentViewsCount;
 
-        // Getters and setters
-        public UUID getVideoId() { return videoId; }
-        public void setVideoId(UUID videoId) { this.videoId = videoId; }
-
-        public Long getTotalWatchTime() { return totalWatchTime; }
-        public void setTotalWatchTime(Long totalWatchTime) { this.totalWatchTime = totalWatchTime; }
-
-        public Long getUniqueViewers() { return uniqueViewers; }
-        public void setUniqueViewers(Long uniqueViewers) { this.uniqueViewers = uniqueViewers; }
-
-        public Double getCompletionRate() { return completionRate; }
-        public void setCompletionRate(Double completionRate) { this.completionRate = completionRate; }
-
-        public Long getRecentViewsCount() { return recentViewsCount; }
-        public void setRecentViewsCount(Long recentViewsCount) { this.recentViewsCount = recentViewsCount; }
     }
-} 
+}
