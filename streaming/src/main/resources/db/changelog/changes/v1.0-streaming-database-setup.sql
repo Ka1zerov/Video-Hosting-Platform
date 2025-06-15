@@ -16,7 +16,7 @@ CREATE TABLE video_qualities (
     encoding_progress INTEGER DEFAULT 0,
     error_message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 COMMENT ON TABLE video_qualities IS 'Different quality versions of videos (480p, 720p, 1080p)';
@@ -40,7 +40,7 @@ CREATE TABLE view_sessions (
     is_complete BOOLEAN DEFAULT false,
     ended_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 COMMENT ON TABLE view_sessions IS 'Video viewing sessions for analytics';

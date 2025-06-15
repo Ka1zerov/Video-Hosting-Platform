@@ -1,0 +1,7 @@
+databaseChangeLog:
+  # Metadata service uses shared database with upload service
+  # No separate table migrations needed for metadata service
+  # All database schema is managed by upload service
+  
+  # Future metadata-specific migrations can be added here
+  # with context: metadata-service to ensure they only run for this service 

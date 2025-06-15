@@ -165,6 +165,9 @@ replay_pid*
 # === Custom secrets and env files ===
 *.env
 
+# === Binary files and build artifacts ===
+bin/
+
 # === Node.js / Frontend ===
 # Dependencies
 node_modules/
