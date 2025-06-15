@@ -14,6 +14,11 @@ SELECT pg_create_physical_replication_slot('replica_slot');
 ALTER SYSTEM SET log_replication_commands = on;
 ALTER SYSTEM SET log_min_messages = info;
 
+-- Configure pg_hba.conf for replication
+\! echo "# Replication connections" >> /var/lib/postgresql/data/pg_hba.conf
+\! echo "host replication replicator 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
+\! echo "host replication replicator ::0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
+
 -- Reload configuration
 SELECT pg_reload_conf();
 

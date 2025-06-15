@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Authentication Service Database
   postgres-auth:
@@ -42,7 +40,6 @@ services:
       - postgres_video_master_data:/var/lib/postgresql/data
       - ./config/postgres/video-init:/docker-entrypoint-initdb.d
       - ./config/postgres/master-init.sql:/docker-entrypoint-initdb.d/99-master-setup.sql
-      - ./config/postgres/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
     command: >
       postgres 
       -c wal_level=replica 
@@ -101,6 +98,7 @@ services:
     ports:
       - "5435:5435"  # Master (writes) - routes to master only
       - "5436:5436"  # Slave (reads) - routes to master + slave with load balancing
+      - "8404:8404"  # HAProxy statistics page
     volumes:
       - ./config/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     depends_on:
@@ -200,12 +198,12 @@ services:
     restart: unless-stopped
     profiles: ["admin", "admin-video"]
 
-  # Redis Commander
+  # Redis Commander for Redis management
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: platform-redis-commander
     environment:
-      REDIS_HOSTS: local:redis:6379
+      REDIS_HOSTS: redis:redis:6379
     ports:
       - "8081:8081"
     networks:
@@ -213,26 +211,26 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
-    profiles: ["admin", "admin-video"]
+    profiles: ["admin", "admin-redis"]
 
+# Named volumes for data persistence
+volumes:
+  postgres_auth_data:
+    driver: local
+  postgres_video_master_data:
+    driver: local
+  postgres_video_slave_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  pgadmin_auth_data:
+    driver: local
+  pgadmin_video_data:
+    driver: local
+
+# Custom network for service communication
 networks:
   platform-network:
     driver: bridge
-    name: platform-network
-    external: false
-
-volumes:
-  postgres_auth_data:
-    name: platform_postgres_auth_data
-  postgres_video_master_data:
-    name: platform_postgres_video_master_data
-  postgres_video_slave_data:
-    name: platform_postgres_video_slave_data
-  redis_data:
-    name: platform_redis_data
-  rabbitmq_data:
-    name: platform_rabbitmq_data
-  pgadmin_auth_data:
-    name: platform_pgladmin_auth_data
-  pgadmin_video_data:
-    name: platform_pgadmin_video_data

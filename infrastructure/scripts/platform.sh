@@ -98,7 +98,7 @@ case "$1" in
             echo "⏳ Waiting for replication setup..."
             sleep 10
             echo "🔄 Checking replication status..."
-            docker compose exec postgres-video-master psql -U upload_user -d video_platform -c "SELECT * FROM pg_stat_replication;" || echo "ℹ️  Replication will be available shortly"
+            docker compose exec postgres-video-master psql -U upload_user -d video_platform -c "SELECT * FROM pg_stat_replication;" | cat || echo "ℹ️  Replication will be available shortly"
         fi
         ;;
 
@@ -148,7 +148,7 @@ case "$1" in
             flush_lag,
             replay_lag
         FROM pg_stat_replication;
-        " || echo "❌ Master database not available"
+        " | cat || echo "❌ Master database not available"
         
         echo ""
         echo "📊 Slave Recovery Status:"
@@ -161,11 +161,11 @@ case "$1" in
             pg_last_wal_receive_lsn() as last_received_lsn,
             pg_last_wal_replay_lsn() as last_replayed_lsn,
             pg_last_xact_replay_timestamp() as last_replay_time;
-        " || echo "❌ Slave database not available"
+        " | cat || echo "❌ Slave database not available"
         
         echo ""
         echo "⚖️  HAProxy Backend Status:"
-        curl -s http://localhost:8404/stats | grep -E "(postgres-master|postgres-slave|BACKEND)" | head -10 || echo "❌ HAProxy stats not available"
+        curl -s "http://localhost:8404/stats;csv" | grep -E "postgres" | awk -F',' '{printf "%-20s %-10s %-15s\n", $1"/"$2, $18, $19}' | head -10 || echo "❌ HAProxy stats not available"
         ;;
 
     "promote-slave")
