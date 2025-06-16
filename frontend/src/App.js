@@ -5,15 +5,9 @@ import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import DebugPage from './pages/DebugPage';
 import VideosPage from './pages/VideosPage';
+import VideoPlayerPage from './pages/VideoPlayerPage';
 
 // Placeholder components for future pages
-const VideoPage = () => (
-  <div style={{ padding: '40px', textAlign: 'center' }}>
-    <h1 style={{ color: '#d32f2f' }}>Video Player</h1>
-    <p style={{ color: '#666' }}>Video player functionality will be implemented here.</p>
-  </div>
-);
-
 const AnalyticsPage = () => (
   <div style={{ padding: '40px', textAlign: 'center' }}>
     <h1 style={{ color: '#d32f2f' }}>Analytics</h1>
@@ -68,7 +62,7 @@ function App() {
             path="/video/:id" 
             element={
               <ProtectedRoute>
-                <VideoPage />
+                <VideoPlayerPage />
               </ProtectedRoute>
             } 
           />

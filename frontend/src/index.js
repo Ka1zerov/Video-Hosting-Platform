@@ -33,6 +33,11 @@ const globalStyles = `
     outline: 2px solid #d32f2f;
     outline-offset: 2px;
   }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
   
   .container {
     max-width: 1200px;

@@ -147,6 +147,72 @@ class VideoService {
   }
 
   /**
+   * Get video stream information for playback
+   */
+  async getVideoStreamInfo(videoId) {
+    try {
+      const playbackRequest = {
+        videoId: videoId,
+        format: 'hls'
+      };
+
+      const response = await authService.apiRequest(
+        `${GATEWAY_URL}/api/streaming/play`,
+        {
+          method: 'POST',
+          body: JSON.stringify(playbackRequest)
+        }
+      );
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get video stream info:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get master playlist content with JWT authentication and create blob URL
+   */
+  async getMasterPlaylistBlob(videoId, expirationHours = 2) {
+    try {
+      const response = await authService.apiRequest(
+        `${GATEWAY_URL}/api/streaming/playlist/${videoId}/master.m3u8?expirationHours=${expirationHours}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get playlist: ${response.status} ${response.statusText}`);
+      }
+      
+      const playlistContent = await response.text();
+      const blob = new Blob([playlistContent], { type: 'application/vnd.apple.mpegurl' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      console.log('Created master playlist blob URL:', blobUrl);
+      return blobUrl;
+    } catch (error) {
+      console.error('Failed to get master playlist:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Cleanup blob URL
+   */
+  cleanupBlobUrl(blobUrl) {
+    if (blobUrl && blobUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(blobUrl);
+      console.log('Cleaned up blob URL:', blobUrl);
+    }
+  }
+
+  /**
+   * Get master playlist URL for HLS streaming (deprecated - use getMasterPlaylistBlob)
+   */
+  getMasterPlaylistUrl(videoId, expirationHours = 2) {
+    return `${GATEWAY_URL}/api/streaming/playlist/${videoId}/master.m3u8?expirationHours=${expirationHours}`;
+  }
+
+  /**
    * Handle API errors
    */
   handleError(error) {
