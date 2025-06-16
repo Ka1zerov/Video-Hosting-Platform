@@ -60,9 +60,22 @@ aws:
   cloudfront:
     domain: ${CLOUDFRONT_DOMAIN:}
     enabled: ${CLOUDFRONT_ENABLED:false}
+    # CloudFront Signing Configuration (for secure video access)
+    signing:
+      enabled: ${CLOUDFRONT_SIGNING_ENABLED:true}
+      key-pair-id: ${CLOUDFRONT_KEY_PAIR_ID:}
+      private-key-path: ${CLOUDFRONT_PRIVATE_KEY_PATH:classpath:keys/cloudfront-private-key.pem}
+      default-expiration-hours: ${CLOUDFRONT_DEFAULT_EXPIRATION:2}
 
 # Streaming Configuration
 streaming:
+  # Dynamic playlist configuration
+  dynamic-playlists:
+    enabled: true
+    default-expiration-hours: 2
+    max-expiration-hours: 24
+    cache-control: "no-cache, no-store, must-revalidate"
+  
   # Supported video formats and qualities
   formats:
     hls:
@@ -126,6 +139,7 @@ management:
 logging:
   level:
     com.tskrypko.streaming: INFO
+    com.tskrypko.streaming.service.CloudFrontService: DEBUG
     org.springframework.web: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

@@ -21,7 +21,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/streaming/sessions")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:8080"})
 public class ViewSessionController {
 
     private final ViewSessionService viewSessionService;
@@ -61,14 +60,28 @@ public class ViewSessionController {
      * End viewing session
      */
     @PostMapping("/end")
-    public ResponseEntity<String> endViewSession(
-            @RequestParam String sessionId,
-            @RequestParam(defaultValue = "false") boolean isComplete) {
+    public ResponseEntity<String> endViewSession(@RequestBody EndSessionRequest request) {
         
-        log.info("Ending view session: {} (complete: {})", sessionId, isComplete);
+        if (request.getSessionId() == null || request.getSessionId().trim().isEmpty()) {
+            log.warn("End session called without sessionId");
+            return ResponseEntity.badRequest().body("Session ID is required");
+        }
         
-        viewSessionService.endViewSession(sessionId, isComplete);
+        log.info("Ending view session: {} (complete: {})", request.getSessionId(), request.getIsComplete());
+        
+        viewSessionService.endViewSession(request.getSessionId(), request.getIsComplete());
         return ResponseEntity.ok("Session ended");
+    }
+
+    // DTO for end session request
+    public static class EndSessionRequest {
+        private String sessionId;
+        private Boolean isComplete = false;
+
+        public String getSessionId() { return sessionId; }
+        public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+        public Boolean getIsComplete() { return isComplete != null ? isComplete : false; }
+        public void setIsComplete(Boolean isComplete) { this.isComplete = isComplete; }
     }
 
     /**

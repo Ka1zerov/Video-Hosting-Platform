@@ -58,7 +58,10 @@ public class VideoStreamingService {
         response.setDuration(video.getDuration());
         response.setThumbnailUrl(videoUrlService.buildThumbnailUrl(video.getId().toString()));
         response.setViewsCount(video.getViewsCount());
-        response.setHlsManifestUrl(videoUrlService.buildMasterHlsManifestUrl(video.getId().toString()));
+        
+        // Use dynamic master playlist instead of static S3 file
+        String dynamicMasterUrl = buildDynamicMasterPlaylistUrl(video.getId().toString());
+        response.setHlsManifestUrl(dynamicMasterUrl);
         response.setDashManifestUrl(videoUrlService.buildDashManifestUrl(video.getId().toString()));
 
         // For MVP: All videos have all qualities available (1080p, 720p, 480p)
@@ -70,9 +73,16 @@ public class VideoStreamingService {
         // Add CDN URLs if CloudFront is enabled
         if (cloudFrontService.isEnabled()) {
             VideoStreamResponse.StreamUrls cdnUrls = new VideoStreamResponse.StreamUrls();
-            cdnUrls.setHlsUrl(cloudFrontService.getCdnUrl(response.getHlsManifestUrl()));
+            
+            // Use signed URLs for secure access (2 hours expiration)
+            LocalDateTime expiryTime = LocalDateTime.now().plusHours(2);
+            
+            // For now, use regular CDN URLs without signing
+            // Dynamic master playlist will handle signed URLs for individual quality playlists
+            cdnUrls.setHlsUrl(dynamicMasterUrl); // Keep dynamic master URL (no CDN for this)
             cdnUrls.setDashUrl(cloudFrontService.getCdnUrl(response.getDashManifestUrl()));
             cdnUrls.setThumbnailUrl(cloudFrontService.getCdnUrl(response.getThumbnailUrl()));
+            
             cdnUrls.setCdnEnabled(true);
             response.setCdnUrls(cdnUrls);
         }
@@ -193,7 +203,9 @@ public class VideoStreamingService {
         // Build HLS playlist URL using VideoUrlService
         String hlsPlaylistUrl = videoUrlService.buildHlsPlaylistUrl(videoId, quality);
         if (cloudFrontService.isEnabled()) {
-            hlsPlaylistUrl = cloudFrontService.getCdnUrl(hlsPlaylistUrl);
+            // Use signed URL with 2 hours expiration (will be handled by dynamic master playlist)
+            LocalDateTime expiryTime = LocalDateTime.now().plusHours(2);
+            hlsPlaylistUrl = cloudFrontService.getSignedCdnUrl(hlsPlaylistUrl, expiryTime);
         }
         option.setHlsPlaylistUrl(hlsPlaylistUrl);
         
@@ -216,7 +228,13 @@ public class VideoStreamingService {
         response.setTitle(video.getTitle());
         response.setDescription(video.getDescription());
         response.setDuration(video.getDuration());
-        response.setThumbnailUrl(videoUrlService.buildThumbnailUrl(video.getId().toString()));
+        
+        // Build thumbnail URL with CDN if enabled
+        String thumbnailUrl = videoUrlService.buildThumbnailUrl(video.getId().toString());
+        if (cloudFrontService.isEnabled()) {
+            thumbnailUrl = cloudFrontService.getCdnUrl(thumbnailUrl);
+        }
+        response.setThumbnailUrl(thumbnailUrl);
         response.setViewsCount(video.getViewsCount());
         
         // For MVP: All videos have all qualities available
@@ -226,5 +244,15 @@ public class VideoStreamingService {
         response.setQualities(qualityOptions);
         
         return response;
+    }
+
+    /**
+     * Build URL for dynamic master playlist endpoint
+     * Returns relative URL to work through Gateway routing
+     */
+    private String buildDynamicMasterPlaylistUrl(String videoId) {
+        // Return relative URL that will be handled by Gateway routing
+        // Gateway will proxy /api/streaming/* to streaming service
+        return String.format("/api/streaming/playlist/%s/master.m3u8", videoId);
     }
 } 

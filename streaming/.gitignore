@@ -28,6 +28,12 @@ logs/
 # AWS credentials (never commit)
 aws-credentials.properties
 
+# CloudFront private keys (never commit)
+src/main/resources/keys/*.pem
+src/main/resources/keys/*.der
+src/main/resources/keys/*.key
+*.private-key.*
+
 # Test coverage
 coverage/
 *.coverage

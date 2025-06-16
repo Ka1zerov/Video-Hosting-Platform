@@ -26,8 +26,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.liquibase:liquibase-core'
+    
+    // AWS SDK v2 dependencies for CloudFront signing
+    implementation platform('software.amazon.awssdk:bom:2.20.56')
+    implementation 'software.amazon.awssdk:cloudfront'
+    implementation 'software.amazon.awssdk:s3'
+    
+    // Legacy AWS SDK v1 (remove if not needed elsewhere)
     implementation 'com.amazonaws:aws-java-sdk-s3:1.12.605'
     implementation 'com.amazonaws:aws-java-sdk-cloudfront:1.12.605'
+    
     implementation 'org.postgresql:postgresql:42.7.3'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'

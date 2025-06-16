@@ -1,16 +1,25 @@
 package com.tskrypko.streaming.service;
 
-import com.amazonaws.services.cloudfront.AmazonCloudFront;
-import com.amazonaws.services.cloudfront.AmazonCloudFrontClientBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import software.amazon.awssdk.services.cloudfront.CloudFrontUtilities;
+import software.amazon.awssdk.services.cloudfront.model.CannedSignerRequest;
+import software.amazon.awssdk.services.cloudfront.url.SignedUrl;
 
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
+/**
+ * Service for CloudFront CDN operations with signed URL generation
+ * Uses AWS SDK v2 CloudFrontUtilities for proper URL signing
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -22,6 +31,18 @@ public class CloudFrontService {
     @Value("${aws.cloudfront.enabled:false}")
     private boolean cloudFrontEnabled;
 
+    @Value("${aws.cloudfront.signing.enabled:false}")
+    private boolean signingEnabled;
+
+    @Value("${aws.cloudfront.signing.key-pair-id:}")
+    private String keyPairId;
+
+    @Value("${aws.cloudfront.signing.private-key-path:}")
+    private String privateKeyPath;
+
+    @Value("${aws.cloudfront.signing.default-expiration-hours:2}")
+    private int defaultExpirationHours;
+
     @Value("${aws.s3.bucket.name}")
     private String s3BucketName;
 
@@ -31,16 +52,16 @@ public class CloudFrontService {
     @Value("${streaming.cdn.manifest-cache-control:public, max-age=60}")
     private String manifestCacheControl;
 
-    private AmazonCloudFront cloudFrontClient;
+    private CloudFrontUtilities cloudFrontUtilities;
 
     /**
-     * Initialize CloudFront client
+     * Initialize CloudFront utilities (lazy initialization)
      */
-    private AmazonCloudFront getCloudFrontClient() {
-        if (cloudFrontClient == null) {
-            cloudFrontClient = AmazonCloudFrontClientBuilder.standard().build();
+    private CloudFrontUtilities getCloudFrontUtilities() {
+        if (cloudFrontUtilities == null) {
+            cloudFrontUtilities = CloudFrontUtilities.create();
         }
-        return cloudFrontClient;
+        return cloudFrontUtilities;
     }
 
     /**
@@ -51,7 +72,16 @@ public class CloudFrontService {
     }
 
     /**
-     * Get CDN URL for S3 object
+     * Check if CloudFront URL signing is enabled and properly configured
+     */
+    public boolean isSigningEnabled() {
+        return isEnabled() && signingEnabled && 
+               StringUtils.hasText(keyPairId) && 
+               StringUtils.hasText(privateKeyPath);
+    }
+
+    /**
+     * Get CDN URL for S3 object (without signing)
      */
     public String getCdnUrl(String s3Url) {
         if (!isEnabled() || !StringUtils.hasText(s3Url)) {
@@ -78,27 +108,57 @@ public class CloudFrontService {
     }
 
     /**
-     * Get signed CDN URL with expiration (for secure content)
+     * Get signed CDN URL with expiration for secure content
+     * This implements real CloudFront URL signing using AWS SDK v2
      */
     public String getSignedCdnUrl(String s3Url, LocalDateTime expiryTime) {
-        if (!isEnabled()) {
-            return s3Url;
+        if (!isSigningEnabled()) {
+            log.debug("CloudFront signing not enabled, returning unsigned CDN URL");
+            return getCdnUrl(s3Url);
         }
 
         try {
+            // Convert to CDN URL first
             String cdnUrl = getCdnUrl(s3Url);
+            
+            // Convert LocalDateTime to Instant
+            Instant expirationInstant = expiryTime.toInstant(ZoneOffset.UTC);
+            
+            // Get private key path
+            Path privateKey = getPrivateKeyPath();
+            if (privateKey == null) {
+                log.error("Private key path not found: {}", privateKeyPath);
+                return cdnUrl;
+            }
 
-            // For now, return unsigned URL
-            // In production, you would implement CloudFront signed URLs here
-            // using SignerUtils.signUrlCanned() with your private key
+            // Create canned signer request
+            CannedSignerRequest cannedRequest = CannedSignerRequest.builder()
+                    .resourceUrl(cdnUrl)
+                    .privateKey(privateKey)
+                    .keyPairId(keyPairId)
+                    .expirationDate(expirationInstant)
+                    .build();
 
-            log.debug("Generated signed CDN URL for: {}", s3Url);
-            return cdnUrl;
+            // Generate signed URL using CloudFront utilities
+            SignedUrl signedUrl = getCloudFrontUtilities().getSignedUrlWithCannedPolicy(cannedRequest);
+            String finalSignedUrl = signedUrl.url();
+
+            log.debug("Generated signed CDN URL: {} -> {}", s3Url, finalSignedUrl);
+            return finalSignedUrl;
 
         } catch (Exception e) {
-            log.error("Error generating signed CDN URL: {}", s3Url, e);
-            return s3Url;
+            log.error("Error generating signed CDN URL for: {}", s3Url, e);
+            // Fallback to unsigned CDN URL
+            return getCdnUrl(s3Url);
         }
+    }
+
+    /**
+     * Get signed CDN URL with default expiration
+     */
+    public String getSignedCdnUrl(String s3Url) {
+        LocalDateTime expiryTime = LocalDateTime.now().plusHours(defaultExpirationHours);
+        return getSignedCdnUrl(s3Url, expiryTime);
     }
 
     /**
@@ -140,6 +200,31 @@ public class CloudFrontService {
     }
 
     /**
+     * Get private key path, handle both classpath and file system paths
+     */
+    private Path getPrivateKeyPath() {
+        try {
+            if (privateKeyPath.startsWith("classpath:")) {
+                // Handle classpath resource
+                String resourcePath = privateKeyPath.substring("classpath:".length());
+                URL resource = getClass().getClassLoader().getResource(resourcePath);
+                if (resource != null) {
+                    return Paths.get(resource.toURI());
+                } else {
+                    log.error("Classpath resource not found: {}", resourcePath);
+                    return null;
+                }
+            } else {
+                // Handle file system path
+                return Paths.get(privateKeyPath);
+            }
+        } catch (Exception e) {
+            log.error("Error resolving private key path: {}", privateKeyPath, e);
+            return null;
+        }
+    }
+
+    /**
      * Invalidate CDN cache for specific paths (useful when content is updated)
      */
     public void invalidateCache(String... paths) {
@@ -149,9 +234,8 @@ public class CloudFrontService {
         }
 
         try {
-            // In production, you would implement CloudFront invalidation here
-            // using createInvalidation() API call
-
+            // TODO: Implement CloudFront invalidation using AWS SDK v2
+            // This would require createInvalidation() API call
             log.info("CloudFront cache invalidation requested for {} paths", paths.length);
 
         } catch (Exception e) {
@@ -159,4 +243,18 @@ public class CloudFrontService {
         }
     }
 
+    /**
+     * Log current configuration for debugging
+     */
+    public void logConfiguration() {
+        log.info("CloudFront Configuration:");
+        log.info("  - Enabled: {}", cloudFrontEnabled);
+        log.info("  - Domain: {}", cloudFrontDomain);
+        log.info("  - Signing Enabled: {}", signingEnabled);
+        log.info("  - Key Pair ID: {}", keyPairId != null ? keyPairId.substring(0, Math.min(keyPairId.length(), 8)) + "..." : "not set");
+        log.info("  - Private Key Path: {}", privateKeyPath);
+        log.info("  - Default Expiration: {} hours", defaultExpirationHours);
+        log.info("  - Is Fully Configured: {}", isSigningEnabled());
+    }
 }
+
