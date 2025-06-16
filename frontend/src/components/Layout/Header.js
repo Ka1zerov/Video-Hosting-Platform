@@ -47,6 +47,21 @@ const Header = () => {
         </a>
         
         <a 
+          href="/videos" 
+          style={{
+            color: 'white',
+            textDecoration: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+          onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+        >
+          Videos
+        </a>
+        
+        <a 
           href="/upload" 
           style={{
             color: 'white',

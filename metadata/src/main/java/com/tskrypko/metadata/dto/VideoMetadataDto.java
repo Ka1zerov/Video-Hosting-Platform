@@ -22,4 +22,16 @@ public class VideoMetadataDto {
     private LocalDateTime uploadedAt;
     private Long viewsCount;
     private LocalDateTime lastAccessed;
+    
+    // CDN URLs (optional)
+    private CdnUrls cdnUrls;
+    
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CdnUrls {
+        private String thumbnailUrl;
+        private boolean cdnEnabled;
+    }
 } 

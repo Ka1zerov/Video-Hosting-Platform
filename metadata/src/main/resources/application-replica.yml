@@ -68,6 +68,16 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
     virtual-host: ${RABBITMQ_VHOST:/}
 
+# AWS Configuration
+aws:
+  s3:
+    bucket:
+      name: ${S3_BUCKET_NAME:video-hosting-bucket}
+  region: ${AWS_REGION:us-east-1}
+  cloudfront:
+    domain: ${CLOUDFRONT_DOMAIN:}
+    enabled: ${CLOUDFRONT_ENABLED:true}
+
 # RabbitMQ Configuration
 rabbitmq:
   exchange:

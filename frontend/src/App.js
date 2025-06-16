@@ -4,15 +4,9 @@ import ProtectedRoute from './components/Auth/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import DebugPage from './pages/DebugPage';
+import VideosPage from './pages/VideosPage';
 
 // Placeholder components for future pages
-const VideosPage = () => (
-  <div style={{ padding: '40px', textAlign: 'center' }}>
-    <h1 style={{ color: '#d32f2f' }}>All Videos</h1>
-    <p style={{ color: '#666' }}>Video list functionality will be implemented here.</p>
-  </div>
-);
-
 const VideoPage = () => (
   <div style={{ padding: '40px', textAlign: 'center' }}>
     <h1 style={{ color: '#d32f2f' }}>Video Player</h1>

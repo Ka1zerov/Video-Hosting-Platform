@@ -25,9 +25,6 @@ public class Video extends BaseEntity {
     @Column(name = "duration")
     private Long duration; // Duration in seconds
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private VideoStatus status = VideoStatus.UPLOADED;
