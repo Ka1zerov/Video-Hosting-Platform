@@ -6,7 +6,7 @@ server:
 spring:
   application:
     name: encoding-service
-  
+
   # Write operations - HAProxy routes to Master
   datasource:
     url: jdbc:postgresql://localhost:5435/video_platform
@@ -32,7 +32,7 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       validation-timeout: 5000
-  
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -42,11 +42,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false  # Disable in production
-  
+
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
-  
+
   # Redis configuration for production
   data:
     redis:
@@ -59,7 +59,7 @@ spring:
           max-active: 20
           max-idle: 10
           min-idle: 5
-  
+
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -87,6 +87,7 @@ rabbitmq:
   routing:
     key:
       encoding: ${RABBITMQ_ROUTING_KEY_ENCODING:video.encoding}
+      streaming: ${RABBITMQ_ROUTING_KEY_STREAMING:video.streaming}
 
 # FFmpeg Configuration
 ffmpeg:
@@ -126,5 +127,7 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/encoding-service.log
-    max-size: 100MB
-    max-history: 30 
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30

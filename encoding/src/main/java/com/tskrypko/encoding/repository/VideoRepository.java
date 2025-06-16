@@ -22,10 +22,8 @@ public interface VideoRepository extends JpaRepository<Video, UUID> {
     void updateStatus(@Param("id") UUID id, @Param("status") VideoStatus status);
 
     @Modifying
-    @Query("UPDATE Video v SET v.status = :status, v.duration = :duration, v.thumbnailUrl = :thumbnailUrl, v.hlsManifestUrl = :hlsManifestUrl WHERE v.id = :id")
+    @Query("UPDATE Video v SET v.status = :status, v.duration = :duration WHERE v.id = :id")
     void updateVideoAfterEncoding(@Param("id") UUID id, 
                                  @Param("status") VideoStatus status,
-                                 @Param("duration") Long duration,
-                                 @Param("thumbnailUrl") String thumbnailUrl,
-                                 @Param("hlsManifestUrl") String hlsManifestUrl);
+                                 @Param("duration") Long duration);
 } 

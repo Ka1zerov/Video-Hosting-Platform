@@ -15,9 +15,6 @@ CREATE TABLE videos
     user_id             VARCHAR(255) NOT NULL,
     -- Streaming-specific fields
     duration            BIGINT,
-    thumbnail_url       VARCHAR(500),
-    hls_manifest_url    VARCHAR(500),
-    dash_manifest_url   VARCHAR(500),
     views_count         BIGINT DEFAULT 0,
     last_accessed       TIMESTAMP WITH TIME ZONE,
     -- Audit fields
@@ -30,9 +27,6 @@ CREATE TABLE videos
 
 COMMENT ON TABLE videos IS 'Video files with upload and streaming metadata';
 COMMENT ON COLUMN videos.duration IS 'Video duration in seconds';
-COMMENT ON COLUMN videos.thumbnail_url IS 'URL to video thumbnail image';
-COMMENT ON COLUMN videos.hls_manifest_url IS 'URL to HLS manifest file (.m3u8)';
-COMMENT ON COLUMN videos.dash_manifest_url IS 'URL to DASH manifest file (.mpd)';
 COMMENT ON COLUMN videos.views_count IS 'Total number of views';
 COMMENT ON COLUMN videos.last_accessed IS 'Last time video was accessed for streaming';
 

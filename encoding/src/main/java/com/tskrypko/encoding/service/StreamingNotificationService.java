@@ -30,12 +30,11 @@ public class StreamingNotificationService {
      */
     public void notifyVideoQualitiesCompleted(VideoQualityCompletedEvent event) {
         try {
-            String message = objectMapper.writeValueAsString(event);
-            
+            // Send object directly - RabbitTemplate with Jackson2JsonMessageConverter will serialize it
             rabbitTemplate.convertAndSend(
                 videoExchange,
                 streamingRoutingKey,
-                message
+                event
             );
             
             log.info("Sent video qualities completion notification for video: {} with {} qualities", 

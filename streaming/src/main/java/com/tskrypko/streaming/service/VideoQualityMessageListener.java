@@ -23,18 +23,11 @@ public class VideoQualityMessageListener {
      * Listen for video quality completion messages from encoding service
      */
     @RabbitListener(queues = "${rabbitmq.queue.streaming}")
-    public void handleVideoQualityCompletedMessage(String message) {
-        log.info("Received video quality completion message: {}", message);
+    public void handleVideoQualityCompletedMessage(VideoQualityCompletedEvent event) {
+        log.info("Received video quality completion event: {}", event);
 
         try {
-            // Parse the message to check event type
-            JsonNode messageNode = objectMapper.readTree(message);
-            String eventType = messageNode.path("eventType").asText();
-
-            if ("VIDEO_QUALITIES_COMPLETED".equals(eventType)) {
-                // Parse the complete event
-                VideoQualityCompletedEvent event = objectMapper.readValue(message, VideoQualityCompletedEvent.class);
-                
+            if (event != null && "VIDEO_QUALITIES_COMPLETED".equals(event.getEventType())) {
                 log.info("Processing video qualities completed event for video: {} with {} qualities", 
                         event.getVideoId(), event.getCompletedQualities().size());
 
@@ -44,11 +37,11 @@ public class VideoQualityMessageListener {
                 log.info("Successfully processed video qualities completed event for video: {}", 
                         event.getVideoId());
             } else {
-                log.debug("Ignoring message with event type: {}", eventType);
+                log.warn("Ignoring event with type: {}", event != null ? event.getEventType() : "null");
             }
 
         } catch (Exception e) {
-            log.error("Error processing video quality completion message: {}", message, e);
+            log.error("Error processing video quality completion event: {}", event, e);
             // In production, you might want to send this to a dead letter queue
             // or implement retry logic
         }

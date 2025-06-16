@@ -1,104 +1,83 @@
-# 🎥 Video Streaming Service
+# 🎬 Video Streaming Service
 
-The **Video Streaming Service** is a core microservice of the Video Hosting Platform that handles video playback, streaming, and viewer analytics. It provides secure video access with support for multiple quality streams (HLS/DASH) and CloudFront CDN integration.
+A microservice responsible for video streaming, quality management, and viewing analytics in the video hosting platform.
 
-## 🎯 Features
+## 🚀 Features
 
 ### Core Streaming
-- **Multi-Quality Streaming**: Support for 480p, 720p, 1080p quality streams
-- **Adaptive Streaming**: HLS and DASH manifest generation
-- **Secure Streaming**: JWT-based stream tokens with IP validation
+- **Video Playback**: HLS and DASH streaming support
+- **Quality Selection**: Static quality levels (480p, 720p, 1080p) for MVP
 - **CDN Integration**: CloudFront support for global content delivery
+- **Session Management**: User viewing sessions and analytics
+- **Access Control**: User-based video access validation
 
-### Video Management
-- **Video Discovery**: Browse, search, and filter available videos
-- **Popular Content**: Most viewed and trending videos
-- **User Content**: Personal video libraries
-- **Real-time Analytics**: View counts, watch time, completion rates
+### Analytics & Monitoring
+- **View Tracking**: Real-time view count and session monitoring
+- **Watch Analytics**: Duration, completion rates, and user engagement
+- **Quality Metrics**: Streaming performance and quality statistics
+- **Health Monitoring**: Service health checks and metrics
 
-### Session Management
-- **View Tracking**: Real-time session monitoring
-- **Heartbeat System**: Active session management
-- **Analytics Collection**: Detailed viewing statistics
-- **Quality Switching**: Dynamic quality adaptation
+### MVP Simplifications
+- **Static Quality Enum**: Predefined quality levels instead of dynamic database records
+- **Simplified Processing**: Direct video status updates without complex quality tracking
+- **Fast Response**: Immediate quality availability for all videos
 
 ## 🏗️ Architecture
 
+### Service Components
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Streaming Service                        │
-├─────────────────────────────────────────────────────────────┤
-│  Controllers                                                │
-│  ┌─────────────────────┐  ┌─────────────────────────────┐   │
-│  │ VideoStreamController│  │  ViewSessionController     │   │
-│  │ - Stream playback   │  │  - Session management      │   │
-│  │ - Video discovery   │  │  - Analytics tracking      │   │
-│  └─────────────────────┘  └─────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────┤
-│  Services                                                   │
-│  ┌──────────────────┐ ┌─────────────┐ ┌─────────────────┐  │
-│  │VideoStreamingServ│ │CloudFrontSer│ │ViewSessionServ  │  │
-│  │- Video access    │ │- CDN URLs   │ │- Session mgmt   │  │
-│  │- Quality mgmt    │ │- Cache ctrl │ │- Analytics      │  │
-│  └──────────────────┘ └─────────────┘ └─────────────────┘  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              StreamTokenService                     │   │
-│  │              - JWT tokens                           │   │
-│  │              - Security validation                  │   │
-│  └─────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────┤
-│  Data Layer                                                 │
-│  ┌────────────┐ ┌──────────────┐ ┌──────────────────────┐  │
-│  │   Video    │ │VideoQuality  │ │    ViewSession       │  │
-│  │Repository  │ │Repository    │ │    Repository        │  │
-│  └────────────┘ └──────────────┘ └──────────────────────┘  │
-├─────────────────────────────────────────────────────────────┤
-│  Storage & Cache                                            │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │ PostgreSQL  │ │    Redis    │ │      AWS S3         │   │
-│  │ Video meta  │ │ Stream      │ │   Video files       │   │
-│  │ Sessions    │ │ tokens      │ │   HLS/DASH          │   │
-│  │ Analytics   │ │ Cache       │ │   Thumbnails        │   │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Video Stream  │    │   Session Mgmt  │    │   Analytics     │
+│   Controller    │    │   Service       │    │   Service       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │            Video Streaming Service              │
+         └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              PostgreSQL Database                │
+         │  ┌─────────────┐    ┌─────────────────────────┐ │
+         │  │   videos    │    │    view_sessions        │ │
+         │  └─────────────┘    └─────────────────────────┘ │
+         └─────────────────────────────────────────────────┘
 ```
 
-## 🛠️ Technology Stack
+### Database Schema
 
-- **Framework**: Spring Boot 3.4.5 + Java 21
-- **Database**: PostgreSQL (shared with other services)
-- **Cache**: Redis (session storage, token cache)
-- **Storage**: AWS S3 (video files, manifests)
-- **CDN**: Amazon CloudFront
-- **Security**: JWT tokens, IP validation
-- **Streaming**: HLS/DASH protocols
-
-## 📊 Database Schema
-
-### Video Qualities Table
+### Videos Table
 ```sql
-CREATE TABLE video_qualities (
-    id BIGINT PRIMARY KEY,
-    video_id BIGINT NOT NULL,
-    quality_name VARCHAR(20) NOT NULL,
-    width INTEGER NOT NULL,
-    height INTEGER NOT NULL,
-    bitrate INTEGER NOT NULL,
-    file_size BIGINT,
+CREATE TABLE videos (
+    id UUID PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    original_filename VARCHAR(255) NOT NULL,
+    file_size BIGINT NOT NULL,
+    mime_type VARCHAR(100),
     s3_key VARCHAR(500),
-    hls_playlist_url VARCHAR(500),
-    encoding_status VARCHAR(20) DEFAULT 'PENDING',
-    encoding_progress INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'UPLOADED',
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id VARCHAR(100) NOT NULL,
+    duration BIGINT,
+    views_count BIGINT DEFAULT 0,
+    last_accessed TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100) NOT NULL,
+    modified_by VARCHAR(100) NOT NULL,
+    deleted_at TIMESTAMP
 );
 ```
+
+**Note**: Thumbnail and manifest URLs are generated dynamically using `VideoUrlService` based on video ID and AWS S3 configuration, eliminating the need to store URLs in the database.
 
 ### View Sessions Table
 ```sql
 CREATE TABLE view_sessions (
-    id BIGINT PRIMARY KEY,
-    video_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY,
+    video_id UUID NOT NULL,
     user_id VARCHAR(100),
     session_id VARCHAR(100) UNIQUE NOT NULL,
     ip_address VARCHAR(45),
@@ -113,6 +92,15 @@ CREATE TABLE view_sessions (
 );
 ```
 
+### Video Quality Enum (MVP)
+```java
+public enum VideoQualityEnum {
+    Q_480P("480p", 854, 480, 1000),
+    Q_720P("720p", 1280, 720, 2500),
+    Q_1080P("1080p", 1920, 1080, 4000);
+}
+```
+
 ## 🔌 API Endpoints
 
 ### Video Streaming
@@ -121,7 +109,7 @@ CREATE TABLE view_sessions (
 POST /api/streaming/play
 Content-Type: application/json
 {
-    "videoId": 123,
+    "videoId": "uuid",
     "preferredQuality": "720p",
     "format": "hls",
     "sessionId": "session-uuid"
@@ -143,265 +131,272 @@ GET /api/streaming/videos/user/{userId}?page=0&size=20
 GET /api/streaming/videos/{videoId}
 ```
 
+### Video Quality (MVP)
+```http
+# Get available qualities for video
+GET /api/streaming/qualities/video/{videoId}
+
+# Get quality statistics
+GET /api/streaming/qualities/video/{videoId}/stats
+
+# Get all quality types
+GET /api/streaming/qualities/all
+
+# Health check
+GET /api/streaming/qualities/health
+```
+
 ### Session Management
 ```http
 # Start viewing session
-POST /api/streaming/sessions/start?videoId=123&userId=user1
+POST /api/streaming/sessions/start?videoId={uuid}&userId={userId}
 
 # Send heartbeat (progress update)
 POST /api/streaming/sessions/heartbeat
 Content-Type: application/json
 {
-    "videoId": 123,
     "sessionId": "session-uuid",
     "currentPosition": 120,
-    "watchDuration": 180,
+    "watchDuration": 120,
     "quality": "720p"
 }
 
 # End viewing session
-POST /api/streaming/sessions/end?sessionId=session-uuid&isComplete=true
+POST /api/streaming/sessions/end
+Content-Type: application/json
+{
+    "sessionId": "session-uuid",
+    "isComplete": true
+}
 
-# Get session analytics
+# Get session details
+GET /api/streaming/sessions/{sessionId}
+
+# Get video sessions (admin/owner only)
+GET /api/streaming/sessions/video/{videoId}?page=0&size=20
+
+# Get user sessions
+GET /api/streaming/sessions/user/{userId}?page=0&size=20
+```
+
+### Analytics
+```http
+# Get video analytics
 GET /api/streaming/sessions/analytics/{videoId}
-```
 
-## 🔐 Security
+# Get active sessions (admin only)
+GET /api/streaming/sessions/active
 
-### Stream Tokens
-- **JWT-based**: Secure video access tokens
-- **IP Validation**: Optional IP address verification
-- **Expiration**: 1-hour token lifetime (configurable)
-- **Blacklisting**: Token revocation support
+# Get total watch time
+GET /api/streaming/sessions/watch-time/{videoId}
 
-### Access Control
-```java
-// Token generation
-String token = streamTokenService.generateStreamToken(
-    videoId, sessionId, ipAddress
-);
+# Get unique viewers count
+GET /api/streaming/sessions/viewers/{videoId}
 
-// Token validation
-boolean isValid = streamTokenService.validateStreamToken(
-    token, videoId, ipAddress
-);
-```
-
-## 🌐 CloudFront CDN Integration
-
-### Configuration
-```yaml
-aws:
-  cloudfront:
-    domain: ${CLOUDFRONT_DOMAIN:}
-    enabled: ${CLOUDFRONT_ENABLED:false}
-
-streaming:
-  cdn:
-    enabled: ${CDN_ENABLED:false}
-    cache-control: "public, max-age=31536000"
-    manifest-cache-control: "public, max-age=60"
-```
-
-### URL Conversion
-```java
-// Automatic S3 to CloudFront URL conversion
-String s3Url = "https://bucket.s3.amazonaws.com/videos/file.m3u8";
-String cdnUrl = cloudFrontService.getCdnUrl(s3Url);
-// Result: "https://d123456789.cloudfront.net/videos/file.m3u8"
-```
-
-### Cache Behaviors
-- **Video Segments**: Long cache (1 year)
-- **Manifests**: Short cache (1 minute)
-- **Thumbnails**: Medium cache (1 day)
-
-## 📈 Analytics & Monitoring
-
-### Real-time Metrics
-- **Active Sessions**: Current viewers count
-- **View Counts**: Total and unique viewers
-- **Watch Time**: Total and average watch duration
-- **Completion Rate**: Percentage of completed views
-- **Quality Distribution**: Popular quality preferences
-
-### Session Tracking
-```java
-// Start tracking
-ViewSession session = viewSessionService.startViewSession(
-    videoId, userId, ipAddress, userAgent
-);
-
-// Update progress
-viewSessionService.updateViewSession(heartbeatRequest);
-
-// Get analytics
-VideoAnalytics analytics = viewSessionService.getVideoAnalytics(videoId);
-```
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-- Java 21+
-- Docker & Docker Compose
-- Running infrastructure (PostgreSQL, Redis, RabbitMQ)
-
-### 2. Configuration
-```bash
-# Set environment variables
-export DB_USERNAME=streaming_user
-export DB_PASSWORD=streaming_pass
-export AWS_ACCESS_KEY=your-access-key
-export AWS_SECRET_KEY=your-secret-key
-export CLOUDFRONT_DOMAIN=d123456789.cloudfront.net
-export CLOUDFRONT_ENABLED=true
-```
-
-### 3. Run Service
-```bash
-# Start infrastructure first
-cd ../infrastructure
-./scripts/platform.sh start video
-
-# Run streaming service
-cd ../streaming
-./gradlew bootRun
-```
-
-### 4. Test Endpoints
-```bash
-# Health check
-curl http://localhost:8084/api/streaming/health
-
-# Get available videos
-curl http://localhost:8084/api/streaming/videos
-
-# Start video playback
-curl -X POST http://localhost:8084/api/streaming/play \
-  -H "Content-Type: application/json" \
-  -d '{"videoId": 1, "sessionId": "test-session"}'
+# Get completion rate
+GET /api/streaming/sessions/completion-rate/{videoId}
 ```
 
 ## 🔧 Configuration
 
 ### Application Properties
 ```yaml
-# Streaming settings
+server:
+  port: 8084
+
+spring:
+  application:
+    name: streaming-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5433/video_platform
+    username: ${DB_USERNAME:upload_user}
+    password: ${DB_PASSWORD:upload_pass}
+  
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+aws:
+  s3:
+    bucket:
+      name: ${S3_BUCKET_NAME:video-hosting-bucket}
+  cloudfront:
+    domain: ${CLOUDFRONT_DOMAIN:}
+    enabled: ${CLOUDFRONT_ENABLED:false}
+
 streaming:
-  formats:
-    hls:
-      enabled: true
-      segment-duration: 10
-    dash:
-      enabled: true
-    mp4:
-      enabled: true
+  session:
+    timeout: ${SESSION_TIMEOUT:1800} # 30 minutes
+    cleanup:
+      interval: ${CLEANUP_INTERVAL:300} # 5 minutes
   
-  qualities:
-    - name: "480p"
-      width: 854
-      height: 480
-      bitrate: 1000
-    - name: "720p"
-      width: 1280
-      height: 720
-      bitrate: 2500
-    - name: "1080p"
-      width: 1920
-      height: 1080
-      bitrate: 5000
-  
-  security:
-    token-expiry: 3600
-    rate-limit:
-      requests-per-minute: 60
+  quality:
+    default: ${DEFAULT_QUALITY:720p}
+    adaptive: ${ADAPTIVE_STREAMING:true}
 ```
 
-## 📊 Performance Optimizations
-
-### Database Indexes
-- **Video Lookups**: `(status, created_at)`, `(status, views_count)`
-- **Session Queries**: `(video_id)`, `(user_id)`, `(session_id)`
-- **Analytics**: `(video_id, started_at)`, `(ip_address)`
-
-### Caching Strategy
-- **Video Metadata**: 30 minutes TTL
-- **Stream Tokens**: 1 hour TTL
-- **Analytics**: 15 minutes TTL
-- **Session Data**: 24 hours TTL
-
-### CDN Optimization
-- **Segment Files**: `Cache-Control: public, max-age=31536000`
-- **Manifests**: `Cache-Control: public, max-age=60`
-- **Geographic Distribution**: Global edge locations
-
-## 🐛 Troubleshooting
-
-### Common Issues
-1. **Token Validation Fails**
-   - Check JWT secret configuration
-   - Verify token expiration
-   - Confirm IP address matching
-
-2. **CDN URLs Not Working**
-   - Verify CloudFront domain configuration
-   - Check AWS credentials
-   - Ensure S3 bucket permissions
-
-3. **Session Tracking Issues**
-   - Check Redis connectivity
-   - Verify session ID uniqueness
-   - Monitor heartbeat intervals
-
-### Debug Commands
+### Environment Variables
 ```bash
-# Check service health
-curl http://localhost:8084/actuator/health
+# Database
+DB_USERNAME=streaming_user
+DB_PASSWORD=streaming_pass
 
-# View active sessions
-curl http://localhost:8084/api/streaming/sessions/active
+# AWS
+AWS_ACCESS_KEY=your-access-key
+AWS_SECRET_KEY=your-secret-key
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=video-hosting-bucket
 
-# Check Redis keys
-redis-cli keys "stream_*"
+# CloudFront (optional)
+CLOUDFRONT_DOMAIN=d123456789.cloudfront.net
+CLOUDFRONT_ENABLED=true
 
-# Database session query
-psql -h localhost -p 5433 -U streaming_user -d video_platform \
-  -c "SELECT * FROM view_sessions WHERE ended_at IS NULL;"
+# RabbitMQ
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=guest
+RABBITMQ_PASSWORD=guest
 ```
 
-## 🤝 Integration
+## 🚀 Getting Started
 
-### With Other Services
-- **Upload Service**: Video metadata synchronization
-- **Encoding Service**: Quality stream availability
-- **Metadata Service**: Search and discovery
-- **Gateway**: Authentication and routing
+### Prerequisites
+- Java 21+
+- PostgreSQL 15+
+- Redis 7+
+- RabbitMQ 3.12+
+- AWS S3 access (for video storage)
 
-### Event Communication (RabbitMQ)
-```yaml
-# Listen for encoding completion
-rabbitmq:
-  queue:
-    streaming: video.streaming.queue
-  routing:
-    key:
-      streaming: video.streaming
+### Local Development
+```bash
+# Clone the repository
+git clone <repository-url>
+cd streaming
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Run the service
+./gradlew bootRun
+
+# Or build and run JAR
+./gradlew build
+java -jar build/libs/streaming-0.0.1-SNAPSHOT.jar
 ```
 
-## 📝 Development
+### Docker Deployment
+```bash
+# Build Docker image
+docker build -t streaming-service .
 
-### Adding New Quality
-1. Update configuration
-2. Add database migration
-3. Update encoding service
-4. Test stream generation
+# Run with Docker Compose
+docker-compose up -d
+```
 
-### Custom Analytics
-1. Extend `ViewSession` model
-2. Add repository methods
-3. Update analytics service
-4. Create API endpoints
+## 📊 Monitoring & Health
 
----
+### Health Checks
+```http
+GET /actuator/health
+GET /actuator/health/db
+GET /actuator/health/redis
+GET /actuator/health/rabbitmq
+```
 
-**Note**: This service is designed for educational purposes as part of a Master's thesis. For production deployment, additional security, monitoring, and scalability considerations would be required. 
+### Metrics
+```http
+GET /actuator/metrics
+GET /actuator/metrics/streaming.sessions.active
+GET /actuator/metrics/streaming.videos.views
+GET /actuator/metrics/streaming.quality.requests
+```
+
+## 🔄 Message Processing
+
+### RabbitMQ Integration
+The service listens for video processing completion events:
+
+```java
+@RabbitListener(queues = "${rabbitmq.queue.streaming}")
+public void handleVideoQualityCompletedMessage(VideoQualityCompletedEvent event) {
+    // For MVP: Simply mark video as READY
+    videoQualityService.processCompletedQualities(event);
+}
+```
+
+### Event Types
+- `VIDEO_QUALITIES_COMPLETED`: Video encoding finished, mark as ready for streaming
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+./gradlew test
+```
+
+### Integration Tests
+```bash
+./gradlew integrationTest
+```
+
+### API Testing
+```bash
+# Test video streaming
+curl -X POST http://localhost:8084/api/streaming/play \
+  -H "Content-Type: application/json" \
+  -d '{"videoId":"uuid","preferredQuality":"720p"}'
+
+# Test quality endpoints
+curl http://localhost:8084/api/streaming/qualities/all
+```
+
+## 📈 Performance
+
+### Optimization Features
+- **Connection Pooling**: HikariCP for database connections
+- **Redis Caching**: Session and metadata caching
+- **CDN Integration**: CloudFront for global content delivery
+- **Lazy Loading**: Efficient data fetching strategies
+- **Static Quality Enum**: Fast quality resolution without database queries
+
+### Scaling Considerations
+- Horizontal scaling with load balancers
+- Database read replicas for analytics queries
+- Redis clustering for session storage
+- CDN edge locations for global reach
+
+## 🔒 Security
+
+### Access Control
+- User-based video access validation
+- Session-based authentication
+- IP-based rate limiting
+- CORS configuration for web clients
+
+### Data Protection
+- Encrypted database connections
+- Secure S3 bucket policies
+- CloudFront signed URLs (when enabled)
+- Audit logging for all operations
+
+## 📝 API Documentation
+
+Full API documentation is available at:
+- Swagger UI: `http://localhost:8084/swagger-ui.html`
+- OpenAPI Spec: `http://localhost:8084/v3/api-docs`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

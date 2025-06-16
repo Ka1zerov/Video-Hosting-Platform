@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Setter
 @Getter
@@ -51,18 +50,6 @@ public class Video extends BaseEntity {
     // Streaming-specific fields
     @Column(name = "duration")
     private Long duration; // Duration in seconds
-
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
-
-    @Column(name = "hls_manifest_url")
-    private String hlsManifestUrl;
-
-    @Column(name = "dash_manifest_url")
-    private String dashManifestUrl;
-
-    @OneToMany(mappedBy = "video", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<VideoQuality> qualities;
 
     @Column(name = "views_count")
     private Long viewsCount = 0L;

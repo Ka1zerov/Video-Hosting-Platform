@@ -67,16 +67,6 @@ public interface VideoRepository extends JpaRepository<Video, UUID> {
     void incrementViewCount(@Param("videoId") UUID videoId, @Param("accessTime") LocalDateTime accessTime);
     
     /**
-     * Find videos with HLS manifest URLs
-     */
-    List<Video> findByStatusAndHlsManifestUrlIsNotNullAndDeletedAtIsNull(VideoStatus status);
-    
-    /**
-     * Find videos with DASH manifest URLs
-     */
-    List<Video> findByStatusAndDashManifestUrlIsNotNullAndDeletedAtIsNull(VideoStatus status);
-    
-    /**
      * Count videos by status (excluding deleted)
      */
     long countByStatusAndDeletedAtIsNull(VideoStatus status);

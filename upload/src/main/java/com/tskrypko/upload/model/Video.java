@@ -50,15 +50,6 @@ public class Video extends BaseEntity {
     @Column(name = "duration")
     private Long duration; // Duration in seconds
 
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
-
-    @Column(name = "hls_manifest_url")
-    private String hlsManifestUrl;
-
-    @Column(name = "dash_manifest_url")
-    private String dashManifestUrl;
-
     @Column(name = "views_count")
     private Long viewsCount = 0L;
 

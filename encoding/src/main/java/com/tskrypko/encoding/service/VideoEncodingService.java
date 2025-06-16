@@ -131,19 +131,13 @@ public class VideoEncodingService {
             // Generate thumbnails
             generateThumbnails(job, localInputFile);
 
-            // Build URLs for the encoded content
-            String thumbnailUrl = buildThumbnailUrl(String.valueOf(job.getVideoId()));
-            String hlsManifestUrl = buildHlsManifestUrl(String.valueOf(job.getVideoId()));
-
             // Update encoding job status
             updateJobStatus(job, EncodingStatus.COMPLETED, null, LocalDateTime.now());
 
-            // Update video status to READY with additional info using TransactionTemplate
+            // Update video status to READY with duration using TransactionTemplate
             updateVideoAfterEncodingTransactional(UUID.fromString(String.valueOf(job.getVideoId())),
                                                 VideoStatus.READY,
-                                                durationSeconds,
-                                                thumbnailUrl,
-                                                hlsManifestUrl);
+                                                durationSeconds);
 
             // Notify streaming service about completed qualities
             if (!completedQualities.isEmpty()) {
@@ -404,18 +398,17 @@ public class VideoEncodingService {
      * Updates video after encoding using TransactionTemplate to avoid self-invocation issues.
      * This method is used internally when called from other methods in the same class.
      */
-    private void updateVideoAfterEncodingTransactional(UUID videoId, VideoStatus status, Long duration,
-                                                      String thumbnailUrl, String hlsManifestUrl) {
+    private void updateVideoAfterEncodingTransactional(UUID videoId, VideoStatus status, Long duration) {
         transactionTemplate.execute(tx -> {
             try {
-                videoRepository.updateVideoAfterEncoding(videoId, status, duration, thumbnailUrl, hlsManifestUrl);
+                videoRepository.updateVideoAfterEncoding(videoId, status, duration);
                 logger.info("Updated video after encoding: videoId={}, status={}, duration={}",
                           videoId, status, duration);
+                return null;
             } catch (Exception e) {
-                logger.error("Failed to update video after encoding: videoId={}", videoId, e);
+                logger.error("Failed to update video after encoding: videoId={}, error={}", videoId, e.getMessage());
                 throw new RuntimeException("Failed to update video after encoding", e);
             }
-            return null;
         });
     }
 
@@ -429,7 +422,7 @@ public class VideoEncodingService {
             videoRepository.updateStatus(videoId, status);
             logger.info("Updated video status: videoId={}, status={}", videoId, status);
         } catch (Exception e) {
-            logger.error("Failed to update video status: videoId={}, status={}", videoId, status, e);
+            logger.error("Failed to update video status: videoId={}, status={}, error={}", videoId, status, e.getMessage());
             throw new RuntimeException("Failed to update video status", e);
         }
     }
@@ -439,39 +432,17 @@ public class VideoEncodingService {
      * Uses @Transactional since it's called from outside the class.
      */
     @Transactional
-    public void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration,
-                                        String thumbnailUrl, String hlsManifestUrl) {
+    public void updateVideoAfterEncoding(UUID videoId, VideoStatus status, Long duration) {
         try {
-            videoRepository.updateVideoAfterEncoding(videoId, status, duration, thumbnailUrl, hlsManifestUrl);
-            logger.info("Updated video after encoding: videoId={}, status={}, duration={}",
-                       videoId, status, duration);
+            videoRepository.updateVideoAfterEncoding(videoId, status, duration);
+            logger.info("Updated video after encoding: videoId={}, status={}, duration={}", videoId, status, duration);
         } catch (Exception e) {
-            logger.error("Failed to update video after encoding: videoId={}", videoId, e);
+            logger.error("Failed to update video after encoding: videoId={}, error={}", videoId, e.getMessage());
             throw new RuntimeException("Failed to update video after encoding", e);
         }
     }
 
-    private String buildThumbnailUrl(String videoId) {
-        // Build S3 URL for thumbnail
-        return String.format("https://%s.s3.%s.amazonaws.com/thumbnails/%s/thumbnail_720p.jpg",
-                           System.getenv("S3_BUCKET_NAME"),
-                           System.getenv("AWS_REGION"),
-                           videoId);
-    }
-
-    private String buildHlsManifestUrl(String videoId) {
-        // Build S3 URL for HLS master playlist
-        return String.format("https://%s.s3.%s.amazonaws.com/encoded/%s/master.m3u8",
-                           System.getenv("S3_BUCKET_NAME"),
-                           System.getenv("AWS_REGION"),
-                           videoId);
-    }
-
     private String buildS3Url(String s3Key) {
-        // Build S3 URL for streaming service
-        return String.format("https://%s.s3.%s.amazonaws.com/%s",
-                           System.getenv("S3_BUCKET_NAME"),
-                           System.getenv("AWS_REGION"),
-                           s3Key);
+        return String.format("https://%s.s3.%s.amazonaws.com/%s", s3BucketName, awsRegion, s3Key);
     }
 }

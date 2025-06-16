@@ -4,11 +4,9 @@ import com.tskrypko.streaming.dto.PlaybackRequest;
 import com.tskrypko.streaming.dto.VideoStreamResponse;
 import com.tskrypko.streaming.exception.VideoAccessDeniedException;
 import com.tskrypko.streaming.exception.VideoNotFoundException;
-import com.tskrypko.streaming.model.EncodingStatus;
 import com.tskrypko.streaming.model.Video;
-import com.tskrypko.streaming.model.VideoQuality;
+import com.tskrypko.streaming.model.VideoQualityEnum;
 import com.tskrypko.streaming.model.VideoStatus;
-import com.tskrypko.streaming.repository.VideoQualityRepository;
 import com.tskrypko.streaming.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,9 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,10 +27,10 @@ import java.util.UUID;
 public class VideoStreamingService {
 
     private final VideoRepository videoRepository;
-    private final VideoQualityRepository videoQualityRepository;
     private final CloudFrontService cloudFrontService;
     private final SessionManagementService sessionManagementService;
     private final CurrentUserService currentUserService;
+    private final VideoUrlService videoUrlService;
 
     /**
      * Get video streaming information with access control
@@ -48,14 +47,6 @@ public class VideoStreamingService {
         String currentUserId = currentUserService.getCurrentUserIdOrNull();
         validateVideoAccess(video, currentUserId);
 
-        // Get available qualities
-        List<VideoQuality> qualities = videoQualityRepository
-                .findByVideoIdAndEncodingStatusOrderByBitrateDesc(request.getVideoId(), EncodingStatus.COMPLETED);
-
-        if (qualities.isEmpty()) {
-            throw new VideoNotFoundException("No encoded qualities available for video: " + request.getVideoId());
-        }
-
         // Generate session ID for analytics
         String sessionId = sessionManagementService.generateSessionId(video.getId(), currentUserId, ipAddress);
 
@@ -65,23 +56,23 @@ public class VideoStreamingService {
         response.setTitle(video.getTitle());
         response.setDescription(video.getDescription());
         response.setDuration(video.getDuration());
-        response.setThumbnailUrl(video.getThumbnailUrl());
+        response.setThumbnailUrl(videoUrlService.buildThumbnailUrl(video.getId().toString()));
         response.setViewsCount(video.getViewsCount());
-        response.setHlsManifestUrl(video.getHlsManifestUrl());
-        response.setDashManifestUrl(video.getDashManifestUrl());
+        response.setHlsManifestUrl(videoUrlService.buildMasterHlsManifestUrl(video.getId().toString()));
+        response.setDashManifestUrl(videoUrlService.buildDashManifestUrl(video.getId().toString()));
 
-        // Convert qualities to DTOs
-        List<VideoStreamResponse.QualityOption> qualityOptions = qualities.stream()
-                .map(this::mapToQualityOption)
+        // For MVP: All videos have all qualities available (1080p, 720p, 480p)
+        List<VideoStreamResponse.QualityOption> qualityOptions = Arrays.stream(VideoQualityEnum.values())
+                .map(quality -> mapToQualityOption(quality, video.getId().toString()))
                 .collect(Collectors.toList());
         response.setQualities(qualityOptions);
 
         // Add CDN URLs if CloudFront is enabled
         if (cloudFrontService.isEnabled()) {
             VideoStreamResponse.StreamUrls cdnUrls = new VideoStreamResponse.StreamUrls();
-            cdnUrls.setHlsUrl(cloudFrontService.getCdnUrl(video.getHlsManifestUrl()));
-            cdnUrls.setDashUrl(cloudFrontService.getCdnUrl(video.getDashManifestUrl()));
-            cdnUrls.setThumbnailUrl(cloudFrontService.getCdnUrl(video.getThumbnailUrl()));
+            cdnUrls.setHlsUrl(cloudFrontService.getCdnUrl(response.getHlsManifestUrl()));
+            cdnUrls.setDashUrl(cloudFrontService.getCdnUrl(response.getDashManifestUrl()));
+            cdnUrls.setThumbnailUrl(cloudFrontService.getCdnUrl(response.getThumbnailUrl()));
             cdnUrls.setCdnEnabled(true);
             response.setCdnUrls(cdnUrls);
         }
@@ -90,7 +81,7 @@ public class VideoStreamingService {
         response.setStreamToken(sessionId); // Reusing this field for session ID
         response.setTokenExpiresAt(LocalDateTime.now().plusHours(24)); // Session expires in 24 hours
 
-        log.info("Successfully prepared stream for video: {} with {} qualities", video.getId(), qualities.size());
+        log.info("Successfully prepared stream for video: {} with {} qualities", video.getId(), qualityOptions.size());
         return response;
     }
 
@@ -192,28 +183,29 @@ public class VideoStreamingService {
         return videos.map(this::mapToBasicResponse);
     }
 
-    private VideoStreamResponse.QualityOption mapToQualityOption(VideoQuality quality) {
+    private VideoStreamResponse.QualityOption mapToQualityOption(VideoQualityEnum quality, String videoId) {
         VideoStreamResponse.QualityOption option = new VideoStreamResponse.QualityOption();
         option.setQualityName(quality.getQualityName());
         option.setWidth(quality.getWidth());
         option.setHeight(quality.getHeight());
         option.setBitrate(quality.getBitrate());
         
-        // Use CDN URL if CloudFront is enabled, otherwise use original URL
-        String hlsPlaylistUrl = quality.getHlsPlaylistUrl();
-        if (cloudFrontService.isEnabled() && hlsPlaylistUrl != null) {
+        // Build HLS playlist URL using VideoUrlService
+        String hlsPlaylistUrl = videoUrlService.buildHlsPlaylistUrl(videoId, quality);
+        if (cloudFrontService.isEnabled()) {
             hlsPlaylistUrl = cloudFrontService.getCdnUrl(hlsPlaylistUrl);
         }
         option.setHlsPlaylistUrl(hlsPlaylistUrl);
         
-        option.setAvailable(quality.getEncodingStatus() == EncodingStatus.COMPLETED);
+        // For MVP: all qualities are always available
+        option.setAvailable(true);
         
         log.debug("Mapped quality option: {} ({}x{}) - available: {}, playlist: {}", 
                 quality.getQualityName(), 
                 quality.getWidth(), 
                 quality.getHeight(), 
                 option.getAvailable(),
-                hlsPlaylistUrl != null ? "present" : "missing");
+                hlsPlaylistUrl);
         
         return option;
     }
@@ -224,8 +216,15 @@ public class VideoStreamingService {
         response.setTitle(video.getTitle());
         response.setDescription(video.getDescription());
         response.setDuration(video.getDuration());
-        response.setThumbnailUrl(video.getThumbnailUrl());
+        response.setThumbnailUrl(videoUrlService.buildThumbnailUrl(video.getId().toString()));
         response.setViewsCount(video.getViewsCount());
+        
+        // For MVP: All videos have all qualities available
+        List<VideoStreamResponse.QualityOption> qualityOptions = Arrays.stream(VideoQualityEnum.values())
+                .map(quality -> mapToQualityOption(quality, video.getId().toString()))
+                .collect(Collectors.toList());
+        response.setQualities(qualityOptions);
+        
         return response;
     }
 } 
