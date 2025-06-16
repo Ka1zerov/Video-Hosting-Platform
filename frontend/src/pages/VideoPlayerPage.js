@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import Header from '../components/Layout/Header';
@@ -7,11 +7,15 @@ import videoService from '../services/videoService';
 const VideoPlayerPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const playerRef = useRef(null);
   const [videoData, setVideoData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [playlistBlobUrl, setPlaylistBlobUrl] = useState(null);
+  const [selectedQuality, setSelectedQuality] = useState('auto');
+  const [availableQualities, setAvailableQualities] = useState([]);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -30,6 +34,18 @@ const VideoPlayerPage = () => {
           ...streamInfo,
           masterPlaylistUrl: blobUrl
         });
+
+        // Set available qualities from stream info
+        if (streamInfo.qualities) {
+          setAvailableQualities([
+            { quality: 'auto', label: 'Auto' },
+            ...streamInfo.qualities.map(q => ({
+              quality: q.qualityName,
+              label: `${q.qualityName} (${q.width}x${q.height})`,
+              height: q.height
+            }))
+          ]);
+        }
 
       } catch (err) {
         console.error('Failed to load video:', err);
@@ -53,6 +69,20 @@ const VideoPlayerPage = () => {
     };
   }, [playlistBlobUrl]);
 
+  // Close quality menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showQualityMenu && !event.target.closest('[data-quality-menu]')) {
+        setShowQualityMenu(false);
+      }
+    };
+
+    if (showQualityMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showQualityMenu]);
+
   const handleBack = () => {
     navigate('/videos');
   };
@@ -60,6 +90,50 @@ const VideoPlayerPage = () => {
   const handleHome = () => {
     navigate('/');
   };
+
+  const handleQualityChange = (quality) => {
+    setSelectedQuality(quality);
+    setShowQualityMenu(false);
+    
+    // Access HLS.js instance through ReactPlayer
+    const player = playerRef.current;
+    if (player && player.getInternalPlayer) {
+      const hls = player.getInternalPlayer('hls');
+      if (hls && hls.levels) {
+        if (quality === 'auto') {
+          hls.currentLevel = -1; // Auto quality selection
+        } else {
+          // Find level by quality name/height
+          const targetQuality = availableQualities.find(q => q.quality === quality);
+          if (targetQuality && targetQuality.height) {
+            const levelIndex = hls.levels.findIndex(level => level.height === targetQuality.height);
+            if (levelIndex !== -1) {
+              hls.currentLevel = levelIndex;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // Listen for HLS level changes to update current quality indicator
+  useEffect(() => {
+    const player = playerRef.current;
+    if (player && player.getInternalPlayer && playerReady) {
+      const hls = player.getInternalPlayer('hls');
+      if (hls) {
+        const handleLevelSwitch = (event, data) => {
+          console.log('HLS level switched to:', data.level, hls.levels[data.level]);
+        };
+        
+        hls.on('hlsLevelSwitched', handleLevelSwitch);
+        
+        return () => {
+          hls.off('hlsLevelSwitched', handleLevelSwitch);
+        };
+      }
+    }
+  }, [playerReady]);
 
   if (loading) {
     return (
@@ -229,8 +303,90 @@ const VideoPlayerPage = () => {
           overflow: 'hidden',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
         }}>
+          {/* Quality selector overlay */}
+          {videoData && availableQualities.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 1000
+            }}>
+              <div style={{ position: 'relative' }} data-quality-menu>
+                <button
+                  onClick={() => setShowQualityMenu(!showQualityMenu)}
+                  data-quality-menu
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  ⚙️ {availableQualities.find(q => q.quality === selectedQuality)?.label || 'Auto'}
+                </button>
+                
+                {showQualityMenu && (
+                  <div 
+                    data-quality-menu
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '4px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                      borderRadius: '6px',
+                      padding: '8px 0',
+                      minWidth: '150px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    {availableQualities.map((quality) => (
+                      <button
+                        key={quality.quality}
+                        data-quality-menu
+                        onClick={() => handleQualityChange(quality.quality)}
+                        style={{
+                          width: '100%',
+                          backgroundColor: selectedQuality === quality.quality ? 'rgba(211, 47, 47, 0.8)' : 'transparent',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          textAlign: 'left',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => {
+                          if (selectedQuality !== quality.quality) {
+                            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (selectedQuality !== quality.quality) {
+                            e.target.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        {quality.label}
+                        {selectedQuality === quality.quality && ' ✓'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {videoData && (
             <ReactPlayer
+              ref={playerRef}
               url={videoData.masterPlaylistUrl}
               width="100%"
               height="100%"
@@ -242,11 +398,16 @@ const VideoPlayerPage = () => {
                   hlsOptions: {
                     enableWorker: true,
                     lowLatencyMode: false,
-                    backBufferLength: 90
+                    backBufferLength: 90,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 600
                   }
                 }
               }}
-              onReady={() => setPlayerReady(true)}
+              onReady={() => {
+                setPlayerReady(true);
+                console.log('Player ready');
+              }}
               onError={(error) => {
                 console.error('Player error:', error);
                 setError('Video playback failed. Please try again.');
