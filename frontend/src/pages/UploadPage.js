@@ -34,28 +34,28 @@ const UploadPage = () => {
       <Header />
       
       <div style={{
-        padding: '20px',
+        padding: '15px',
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
         {/* Page Header */}
         <div style={{
           textAlign: 'center',
-          marginBottom: '40px'
+          marginBottom: '25px'
         }}>
           <h1 style={{
             color: '#d32f2f',
-            fontSize: '36px',
+            fontSize: '32px',
             fontWeight: 'bold',
-            margin: '0 0 10px 0'
+            margin: '0 0 8px 0'
           }}>
             📤 Upload Your Video
           </h1>
           <p style={{
             color: '#666',
-            fontSize: '18px',
+            fontSize: '16px',
             margin: 0,
-            lineHeight: '1.5'
+            lineHeight: '1.4'
           }}>
             Share your content with the world. Upload videos up to 2GB in size.
           </p>
@@ -70,15 +70,15 @@ const UploadPage = () => {
         {/* Recent Uploads */}
         {recentUploads.length > 0 && (
           <div style={{
-            marginTop: '40px',
+            marginTop: '25px',
             maxWidth: '800px',
-            margin: '40px auto 0'
+            margin: '25px auto 0'
           }}>
             <h2 style={{
               color: '#333',
-              fontSize: '24px',
+              fontSize: '20px',
               fontWeight: 'bold',
-              marginBottom: '20px',
+              marginBottom: '15px',
               textAlign: 'center'
             }}>
               📊 Recent Uploads
@@ -88,7 +88,7 @@ const UploadPage = () => {
               backgroundColor: 'white',
               border: '2px solid #e0e0e0',
               borderRadius: '8px',
-              padding: '20px'
+              padding: '15px'
             }}>
               {recentUploads.map((upload, index) => (
                 <div
@@ -97,7 +97,7 @@ const UploadPage = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '12px 0',
+                    padding: '8px 0',
                     borderBottom: index < recentUploads.length - 1 ? '1px solid #f0f0f0' : 'none'
                   }}
                 >
@@ -142,113 +142,6 @@ const UploadPage = () => {
             </div>
           </div>
         )}
-
-        {/* Upload Tips */}
-        <div style={{
-          marginTop: '40px',
-          maxWidth: '800px',
-          margin: '40px auto 0'
-        }}>
-          <h2 style={{
-            color: '#333',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            marginBottom: '20px',
-            textAlign: 'center'
-          }}>
-            💡 Upload Tips
-          </h2>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '20px'
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '8px',
-              padding: '20px'
-            }}>
-              <h3 style={{
-                color: '#d32f2f',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                marginBottom: '10px'
-              }}>
-                🎥 Video Quality
-              </h3>
-              <ul style={{
-                color: '#666',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                margin: 0,
-                paddingLeft: '18px'
-              }}>
-                <li>Use high resolution (1080p recommended)</li>
-                <li>Maintain good lighting and audio quality</li>
-                <li>Keep file size under 2GB</li>
-                <li>MP4 format works best</li>
-              </ul>
-            </div>
-
-            <div style={{
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '8px',
-              padding: '20px'
-            }}>
-              <h3 style={{
-                color: '#d32f2f',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                marginBottom: '10px'
-              }}>
-                📝 Metadata
-              </h3>
-              <ul style={{
-                color: '#666',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                margin: 0,
-                paddingLeft: '18px'
-              }}>
-                <li>Choose a clear, descriptive title</li>
-                <li>Add detailed description</li>
-                <li>Use relevant keywords</li>
-                <li>Consider your audience</li>
-              </ul>
-            </div>
-
-            <div style={{
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '8px',
-              padding: '20px'
-            }}>
-              <h3 style={{
-                color: '#d32f2f',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                marginBottom: '10px'
-              }}>
-                ⚡ Performance
-              </h3>
-              <ul style={{
-                color: '#666',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                margin: 0,
-                paddingLeft: '18px'
-              }}>
-                <li>Large files use chunked upload</li>
-                <li>Upload can be resumed if interrupted</li>
-                <li>Processing starts automatically</li>
-                <li>Multiple qualities generated</li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

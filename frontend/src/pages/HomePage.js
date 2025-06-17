@@ -52,14 +52,6 @@ const HomePage = () => {
               linkText="Browse Videos"
               linkHref="/videos"
             />
-            
-            <FeatureCard
-              icon="📊"
-              title="Analytics"
-              description="Track views, engagement, and performance metrics for all your uploaded videos."
-              linkText="View Analytics"
-              linkHref="/analytics"
-            />
           </div>
 
           <div style={{
