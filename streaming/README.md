@@ -213,11 +213,11 @@ spring:
     username: ${DB_USERNAME:upload_user}
     password: ${DB_PASSWORD:upload_pass}
   
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 aws:
   s3:
@@ -254,11 +254,10 @@ S3_BUCKET_NAME=video-hosting-bucket
 CLOUDFRONT_DOMAIN=d123456789.cloudfront.net
 CLOUDFRONT_ENABLED=true
 
-# RabbitMQ
-RABBITMQ_HOST=localhost
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=guest
-RABBITMQ_PASSWORD=guest
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
 ```
 
 ## 🚀 Getting Started
@@ -267,7 +266,6 @@ RABBITMQ_PASSWORD=guest
 - Java 21+
 - PostgreSQL 15+
 - Redis 7+
-- RabbitMQ 3.12+
 - AWS S3 access (for video storage)
 
 ### Local Development
@@ -304,7 +302,6 @@ docker-compose up -d
 GET /actuator/health
 GET /actuator/health/db
 GET /actuator/health/redis
-GET /actuator/health/rabbitmq
 ```
 
 ### Metrics
@@ -314,22 +311,6 @@ GET /actuator/metrics/streaming.sessions.active
 GET /actuator/metrics/streaming.videos.views
 GET /actuator/metrics/streaming.quality.requests
 ```
-
-## 🔄 Message Processing
-
-### RabbitMQ Integration
-The service listens for video processing completion events:
-
-```java
-@RabbitListener(queues = "${rabbitmq.queue.streaming}")
-public void handleVideoQualityCompletedMessage(VideoQualityCompletedEvent event) {
-    // For MVP: Simply mark video as READY
-    videoQualityService.processCompletedQualities(event);
-}
-```
-
-### Event Types
-- `VIDEO_QUALITIES_COMPLETED`: Video encoding finished, mark as ready for streaming
 
 ## 🧪 Testing
 

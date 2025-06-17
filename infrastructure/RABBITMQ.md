@@ -66,59 +66,6 @@ cd infrastructure
 }
 ```
 
-### 2. Video Processing Events
-**Publisher**: Encoding Service  
-**Consumers**: Metadata Service, Streaming Service
-
-```json
-{
-  "eventType": "video.processed",
-  "videoId": "550e8400-e29b-41d4-a716-446655440000",
-  "qualities": [
-    {
-      "resolution": "480p",
-      "s3Key": "videos/550e8400-e29b-41d4-a716-446655440000/480p.mp4",
-      "fileSize": 15728640,
-      "bitrate": "800kbps"
-    },
-    {
-      "resolution": "720p", 
-      "s3Key": "videos/550e8400-e29b-41d4-a716-446655440000/720p.mp4",
-      "fileSize": 31457280,
-      "bitrate": "1500kbps"
-    },
-    {
-      "resolution": "1080p",
-      "s3Key": "videos/550e8400-e29b-41d4-a716-446655440000/1080p.mp4", 
-      "fileSize": 62914560,
-      "bitrate": "3000kbps"
-    }
-  ],
-  "thumbnailUrl": "https://s3.amazonaws.com/bucket/thumbnails/550e8400.jpg",
-  "duration": 300,
-  "timestamp": "2023-12-01T15:35:00Z"
-}
-```
-
-### 3. Metadata Update Events
-**Publisher**: Metadata Service  
-**Consumers**: Streaming Service, Search Service
-
-```json
-{
-  "eventType": "video.metadata.updated",
-  "videoId": "550e8400-e29b-41d4-a716-446655440000",
-  "metadata": {
-    "title": "Updated Title",
-    "description": "Updated description", 
-    "tags": ["tutorial", "programming", "java"],
-    "category": "Education",
-    "privacyLevel": "PUBLIC"
-  },
-  "timestamp": "2023-12-01T15:40:00Z"
-}
-```
-
 ## 🔧 Exchange and Queue Configuration
 
 ### Exchanges
@@ -134,10 +81,6 @@ video.exchange:
 | Service | Queue | Routing Key | Purpose |
 |---------|-------|-------------|---------|
 | Encoding | `video.encoding.queue` | `video.uploaded` | Process new uploads |
-| Metadata | `video.metadata.queue` | `video.uploaded` | Index new videos |
-| Metadata | `video.metadata.queue` | `video.processed` | Update processed video info |
-| Streaming | `video.streaming.queue` | `video.processed` | Add new quality versions |
-| Search | `video.search.queue` | `video.metadata.updated` | Update search index |
 
 ## 🛠️ Service Configuration
 
@@ -196,18 +139,6 @@ Upload Service publishes video.uploaded event
 ┌─────────────────────┬─────────────────────┐
 │ Encoding Service    │ Metadata Service    │
 │ (transcoding)       │ (indexing)          │
-└─────────────────────┴─────────────────────┘
-```
-
-### 2. Video Processing Flow  
-```
-Encoding Service transcodes to 480p/720p/1080p
-        ↓
-Encoding Service publishes video.processed event
-        ↓
-┌─────────────────────┬─────────────────────┐
-│ Metadata Service    │ Streaming Service   │
-│ (update metadata)   │ (prepare streaming) │
 └─────────────────────┴─────────────────────┘
 ```
 

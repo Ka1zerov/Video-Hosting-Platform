@@ -2,48 +2,6 @@
 
 This directory contains the shared infrastructure for the entire Video Hosting Platform with **PostgreSQL Master-Slave replication** support. All microservices use these centralized services to avoid duplication and simplify management.
 
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Video Hosting Platform                       │
-├─────────────────────────────────────────────────────────────────┤
-│  MICROSERVICES                                                  │
-│ ┌─────────────┐   ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
-│ │ Gateway     │─> │ Auth        │  │ Upload      │  │ Metadata│ │
-│ │ Port: 8080  │─> │ Port: 8081  │  │ Port: 8082  │  │ Port:   │ │
-│ │             │─> │             │  │             │  │ 8083    │ │
-│ └─────────────┘   └─────────────┘  └─────────────┘  └─────────┘ │
-│                           │                 │             │     │                    │
-├───────────────────────────┼─────────────────┼─────────────┼─────┤
-│  SHARED INFRASTRUCTURE    │                 │             │     │
-│                    ┌──────┴──────┐          │             │     │
-│                    │ PostgreSQL  │          │             │     │
-│                    │ Auth DB     │          │             │     │
-│                    │ Port: 5432  │          │             │     │
-│                    └─────────────┘          │             │     │
-│                    ┌────────────────────────┴─────────────┴───┐ │
-│                    │ PostgreSQL Video DB (Shared)             │ │
-│                    │ Port: 5433                               │ │
-│                    │ • videos (upload service)                │ │
-│                    │ • video_metadata (metadata service)      │ │
-│                    │ • categories, playlists, analytics...    │ │
-│                    └────────────────────────┬─────────────┬───┘ │
-│                    ┌────────────────────────┴─────────────┴──┐  │
-│                    │ Redis Cache (Shared)                    │  │
-│                    │ Port: 6379                              │  │
-│                    │ • Session cache, metadata cache, etc.   │  │
-│                    └────────────────────────┬─────────────┬──┘  │
-│                    ┌────────────────────────┴─────────────┴──┐  │
-│                    │ RabbitMQ Message Broker                 │  │
-│                    │ Port: 5672 | UI: 15672                  │  │
-│                    │ • Video processing events               │  │
-│                    │ • Search indexing events                │  │
-│                    │ • Encoding completion events            │  │
-│                    └─────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ## 🎯 Services Breakdown
 
 ### **Core Infrastructure**
@@ -340,14 +298,3 @@ infrastructure/
 - **[RABBITMQ.md](RABBITMQ.md)** - Complete RabbitMQ setup and message flow documentation
 - **Project Root README.md** - Overall platform architecture and getting started
 - **Service READMEs** - Individual service documentation
-
-## 🔄 Migration from Service-Specific Infrastructure
-
-If migrating from individual service docker setups:
-
-1. **Stop old services**: `docker-compose down` in each service
-2. **Start new infrastructure**: `./infrastructure/scripts/platform.sh start full`
-3. **Update service configs**: Point to new port numbers if needed
-4. **Clean old volumes**: Remove old docker volumes if necessary
-
-The new infrastructure maintains the same port numbers and database names for compatibility. 
