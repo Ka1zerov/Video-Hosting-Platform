@@ -87,7 +87,6 @@ rabbitmq:
   routing:
     key:
       encoding: ${RABBITMQ_ROUTING_KEY_ENCODING:video.encoding}
-      streaming: ${RABBITMQ_ROUTING_KEY_STREAMING:video.streaming}
 
 # FFmpeg Configuration
 ffmpeg:

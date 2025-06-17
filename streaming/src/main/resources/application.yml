@@ -38,13 +38,6 @@ spring:
           max-active: 10
           max-idle: 5
           min-idle: 2
-  
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-    virtual-host: ${RABBITMQ_VHOST:/}
 
 # AWS Configuration
 aws:
@@ -114,16 +107,6 @@ streaming:
     rate-limit:
       requests-per-minute: 60
       requests-per-hour: 1000
-
-# RabbitMQ Configuration
-rabbitmq:
-  exchange:
-    video: ${RABBITMQ_EXCHANGE:video.exchange}
-  queue:
-    streaming: ${RABBITMQ_QUEUE_STREAMING:video.streaming.queue}
-  routing:
-    key:
-      streaming: ${RABBITMQ_ROUTING_KEY_STREAMING:video.streaming}
 
 # Management endpoints
 management:
