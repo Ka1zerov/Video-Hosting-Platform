@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import Header from '../components/Layout/Header';
 import videoService from '../services/videoService';
+import viewSessionService from '../services/viewSessionService';
 
 const VideoPlayerPage = () => {
   const { id } = useParams();
@@ -16,6 +17,11 @@ const VideoPlayerPage = () => {
   const [selectedQuality, setSelectedQuality] = useState('auto');
   const [availableQualities, setAvailableQualities] = useState([]);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  
+  // Track view session state
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [watchStartTime, setWatchStartTime] = useState(null);
+  const [totalWatchTime, setTotalWatchTime] = useState(0);
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -60,14 +66,95 @@ const VideoPlayerPage = () => {
     }
   }, [id]);
 
-  // Cleanup blob URL when component unmounts or video changes
+  // Start view session when video starts playing
+  const handleVideoStart = async () => {
+    if (!sessionStarted && id) {
+      try {
+        console.log('🎬 Starting view session for video:', id);
+        
+        // Use the service's method to get current user ID
+        await viewSessionService.startViewSession(id);
+        setSessionStarted(true);
+        setWatchStartTime(Date.now());
+        console.log('✅ View session started successfully');
+      } catch (error) {
+        console.error('❌ Failed to start view session:', error);
+        
+        // Check if it's an authorization error
+        if (error.message.includes('403') || error.message.includes('401')) {
+          console.log('🔐 Authorization required - user may need to log in');
+        }
+        
+        // Continue playing even if session tracking fails
+        // This ensures the user experience isn't broken
+      }
+    }
+  };
+
+  // Update playback progress
+  const handleProgress = (progress) => {
+    if (sessionStarted && watchStartTime) {
+      const currentWatchTime = Math.floor((Date.now() - watchStartTime) / 1000);
+      setTotalWatchTime(currentWatchTime);
+      
+      // Update session with current progress
+      viewSessionService.updatePlaybackState(
+        progress.playedSeconds,
+        currentWatchTime,
+        selectedQuality !== 'auto' ? selectedQuality : null
+      );
+    }
+  };
+
+  // Handle video end
+  const handleVideoEnd = () => {
+    if (sessionStarted) {
+      const isComplete = true; // Video played to the end
+      viewSessionService.endViewSession(isComplete);
+      setSessionStarted(false);
+    }
+  };
+
+  // Cleanup session when component unmounts or video changes
   useEffect(() => {
     return () => {
+      if (sessionStarted) {
+        viewSessionService.endViewSession(false);
+      }
       if (playlistBlobUrl) {
         videoService.cleanupBlobUrl(playlistBlobUrl);
       }
     };
-  }, [playlistBlobUrl]);
+  }, [sessionStarted, playlistBlobUrl]);
+
+  // Handle browser/tab close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionStarted) {
+        // Use sendBeacon for reliable cleanup on page unload
+        const session = viewSessionService.getCurrentSession();
+        if (session) {
+          const endSessionData = JSON.stringify({
+            sessionId: session.sessionId,
+            isComplete: false
+          });
+          
+          // Route through Gateway
+          const gatewayUrl = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:8080' 
+            : window.location.origin;
+          
+          navigator.sendBeacon(
+            `${gatewayUrl}/api/streaming/sessions/end`,
+            endSessionData
+          );
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sessionStarted]);
 
   // Close quality menu when clicking outside
   useEffect(() => {
@@ -408,6 +495,9 @@ const VideoPlayerPage = () => {
                 setPlayerReady(true);
                 console.log('Player ready');
               }}
+              onStart={handleVideoStart}
+              onProgress={handleProgress}
+              onEnded={handleVideoEnd}
               onError={(error) => {
                 console.error('Player error:', error);
                 setError('Video playback failed. Please try again.');
