@@ -2,6 +2,8 @@
 
 Upload Service is part of the Video Hosting Platform and handles video file upload processing with advanced reliability features.
 
+- [Upload Technical Documentation](documentation_upload-service.md)
+
 ## Features
 
 - **Video file uploads** to Amazon S3

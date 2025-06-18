@@ -2,6 +2,8 @@
 
 A microservice responsible for video streaming, quality management, and viewing analytics in the video hosting platform.
 
+- [Streaming Technical Documentation](documentation_streaming-service.md)
+
 ## 🚀 Features
 
 ### Core Streaming

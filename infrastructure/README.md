@@ -2,6 +2,10 @@
 
 This directory contains the shared infrastructure for the entire Video Hosting Platform with **PostgreSQL Master-Slave replication** support. All microservices use these centralized services to avoid duplication and simplify management.
 
+- [RabbitMQ documentation](RABBITMQ.md)
+- [Replication documentation](REPLICATION.md)
+- [Infrastructure technical documentation](documentation_infrastructure.md)
+
 ## 🎯 Services Breakdown
 
 ### **Core Infrastructure**

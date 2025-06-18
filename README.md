@@ -152,7 +152,7 @@ Video-Hosting-Platform/
 ├── encoding/               # Video encoding service
 ├── streaming/              # Video streaming service
 ├── frontend/              # React frontend application
-├── docs/                  # Documentation and diagrams
+├── docs/                  # Diagrams
 └── README.md              # This file
 ```
 
@@ -195,11 +195,11 @@ For complete environment variable documentation, see [Environment Variables Setu
 ### Service Documentation
 - [Infrastructure Setup](infrastructure/README.md)
 - [Upload Service](upload/README.md)
-- [Metadata Service](metadata/README.md)
 - [Streaming Service](streaming/README.md)
 - [Encoding Service](encoding/README.md)
-- [Authentication Service](authentication/README.md)
-- [Gateway Service](gateway/README.md)
+- [Metadata Service [technical doc]](metadata/documentation_metadata.md)
+- [Authentication Service [technical doc]](authentication/documentation_authentication.md)
+- [Gateway Service [technical doc] ](gateway/documentation_gateway.md)
 
 ### Full Platform Documentation
 For in-depth documentation of each service, data model, and bucket structure, see:
@@ -297,7 +297,6 @@ RABBITMQ_VHOST=/
 RABBITMQ_EXCHANGE=video.exchange
 RABBITMQ_QUEUE_ENCODING=video.encoding.queue
 RABBITMQ_ROUTING_KEY_ENCODING=video.encoding
-
 ```
 
 ### Streaming Service
@@ -327,12 +326,7 @@ REDIS_PORT=6379
 REDIS_PASSWORD=
 
 # CDN Configuration
-CDN_ENABLED=false
-
-# CORS Configuration
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
-CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
-CORS_ALLOWED_HEADERS=*
+CDN_ENABLED=true
 ```
 
 ### How to Obtain Required Credentials

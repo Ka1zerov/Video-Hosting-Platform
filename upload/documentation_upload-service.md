@@ -554,7 +554,6 @@ ENTRYPOINT ["java", "-jar", "/app.jar"]
 
 ---
 
-**Generated on**: $(date)
-**Version**: 1.0.0
-**Microservice**: Upload Service
-**Platform**: Video Hosting Platform 
+*Document Version: 1.0*   
+*Platform Version: Video Hosting Platform v1.0*  
+*Authors: Platform Development Team* 

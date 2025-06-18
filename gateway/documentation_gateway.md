@@ -248,5 +248,6 @@ Configuration can be externalized using standard Spring Boot environment variabl
 
 ---
 
-*Documentation generated for Gateway microservice - part of Video Hosting Platform*
-*Last updated: Generated from source code analysis* 
+*Document Version: 1.0*
+*Platform Version: Video Hosting Platform v1.0*  
+*Authors: Platform Development Team* 

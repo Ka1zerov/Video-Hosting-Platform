@@ -331,6 +331,6 @@ cd ../metadata && ./gradlew bootRun
 
 ---
 
-*Generated on: [Current Date]*  
-*Service Version: 0.0.1-SNAPSHOT*  
-*Documentation Version: 1.0* 
+*Document Version: 1.0*   
+*Platform Version: Video Hosting Platform v1.0*  
+*Authors: Platform Development Team* 

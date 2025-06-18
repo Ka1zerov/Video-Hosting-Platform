@@ -2,6 +2,8 @@
 
 The Video Encoding Service is responsible for transcoding uploaded videos into multiple bitrates using HLS (HTTP Live Streaming) format. It processes videos asynchronously using RabbitMQ job queues and stores the encoded content in AWS S3.
 
+- [Encoding Technical Documentation](documentation_encoding-service.md)
+
 ## Features
 
 - **Multi-bitrate Encoding**: Transcodes videos into 1080p, 720p, and 480p quality levels

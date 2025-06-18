@@ -276,6 +276,6 @@ All services include health check configurations:
 
 ---
 
-*Generated on: $(date)*
-*Platform Version: Production Infrastructure v1.0*
-*Docker Compose Profiles: auth, video, full, admin* 
+*Document Version: 1.0*
+*Platform Version: Video Hosting Platform v1.0*  
+*Authors: Platform Development Team* 

@@ -295,4 +295,10 @@ Token Request → Token Exchange → JWT Token
    ├────── Access/Refresh Token ─────┤
 ```
 
-This documentation provides a comprehensive overview of the authentication microservice architecture, capabilities, and operational requirements within the distributed video hosting platform. 
+This documentation provides a comprehensive overview of the authentication microservice architecture, capabilities, and operational requirements within the distributed video hosting platform.
+
+---
+
+*Document Version: 1.0*
+*Platform Version: Video Hosting Platform v1.0*  
+*Authors: Platform Development Team* 
