@@ -36,7 +36,7 @@ src/
 
 ## 🔐 Authentication Flow
 
-1. **Initial Load**: Check for valid access token in memory
+1. **Initial Load**: Check for valid access token in localStorage and memory
 2. **Silent Login**: Attempt token refresh using HTTP-only refresh token cookie
 3. **Redirect to Login**: If no valid token, redirect to OAuth2 authorization endpoint
 4. **OAuth2 PKCE Flow**: 
@@ -45,10 +45,32 @@ src/
    - Handle authorization code callback
    - Exchange code for tokens
 5. **Token Management**:
-   - Store access token in memory (5 min TTL)
+   - Store access token in both memory and localStorage for persistence
+   - Include user info and metadata in localStorage
    - Refresh token stored in HTTP-only cookie (7 days TTL)
    - Auto-refresh every 4.5 minutes
+   - Smart refresh: Skip refresh if token was saved recently (< 4 minutes)
 6. **API Requests**: All API calls include Bearer token and handle 401 responses
+
+### 🔄 Token Persistence
+
+The authentication system now properly persists tokens across page reloads:
+
+- **localStorage Storage**: Access tokens are saved to `localStorage` with metadata
+- **Automatic Restoration**: Tokens are restored from localStorage on app initialization  
+- **Cross-Component Compatibility**: Both `AuthService` and `ViewSessionService` can access tokens
+- **Smart Refresh Logic**: Avoids unnecessary refresh calls for recently saved tokens
+
+**localStorage Format**:
+```json
+{
+  "access_token": "eyJ...",
+  "timestamp": 1672531200000,
+  "user_info": { "sub": "user-id", ... },
+  "user_id": "user-id",
+  "id_token": "eyJ..."
+}
+```
 
 ## 📋 Prerequisites
 

@@ -12,6 +12,55 @@ class AuthService {
     this.refreshTimer = null;
     this.isRefreshing = false;
     this.refreshPromise = null;
+    
+    // Try to restore token from localStorage on initialization
+    this.loadTokenFromStorage();
+  }
+
+  /**
+   * Load access token from localStorage
+   */
+  loadTokenFromStorage() {
+    try {
+      const tokens = JSON.parse(localStorage.getItem('auth_tokens'));
+      if (tokens?.access_token) {
+        this.accessToken = tokens.access_token;
+        this.startRefreshTimer();
+        console.log('Access token restored from localStorage');
+      }
+    } catch (error) {
+      console.error('Failed to load token from localStorage:', error);
+      this.clearTokenFromStorage();
+    }
+  }
+
+  /**
+   * Save access token to localStorage
+   */
+  saveTokenToStorage(token, additionalData = {}) {
+    try {
+      const tokenData = {
+        access_token: token,
+        timestamp: Date.now(),
+        ...additionalData
+      };
+      localStorage.setItem('auth_tokens', JSON.stringify(tokenData));
+      console.log('Access token saved to localStorage');
+    } catch (error) {
+      console.error('Failed to save token to localStorage:', error);
+    }
+  }
+
+  /**
+   * Clear access token from localStorage
+   */
+  clearTokenFromStorage() {
+    try {
+      localStorage.removeItem('auth_tokens');
+      console.log('Access token cleared from localStorage');
+    } catch (error) {
+      console.error('Failed to clear token from localStorage:', error);
+    }
   }
 
   /**
@@ -31,8 +80,9 @@ class AuthService {
   /**
    * Set access token and start refresh timer
    */
-  setAccessToken(token) {
+  setAccessToken(token, additionalData = {}) {
     this.accessToken = token;
+    this.saveTokenToStorage(token, additionalData);
     this.startRefreshTimer();
   }
 
@@ -41,6 +91,7 @@ class AuthService {
    */
   clearAccessToken() {
     this.accessToken = null;
+    this.clearTokenFromStorage();
     this.stopRefreshTimer();
   }
 
@@ -73,7 +124,20 @@ class AuthService {
 
     try {
       const tokens = await exchangeCodeForTokens(code, state);
-      this.setAccessToken(tokens.access_token);
+      
+      // Save access token with additional token information
+      const additionalData = {};
+      if (tokens.user_info) {
+        additionalData.user_info = tokens.user_info;
+      }
+      if (tokens.user_id) {
+        additionalData.user_id = tokens.user_id;
+      }
+      if (tokens.id_token) {
+        additionalData.id_token = tokens.id_token;
+      }
+      
+      this.setAccessToken(tokens.access_token, additionalData);
       
       // Clean up URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -108,7 +172,39 @@ class AuthService {
   async _performRefresh() {
     try {
       const tokens = await refreshAccessToken();
-      this.setAccessToken(tokens.access_token);
+      
+      // Preserve existing additional data from localStorage
+      let additionalData = {};
+      try {
+        const existingTokens = JSON.parse(localStorage.getItem('auth_tokens'));
+        if (existingTokens) {
+          // Keep user_info and other data that doesn't change during refresh
+          if (existingTokens.user_info) {
+            additionalData.user_info = existingTokens.user_info;
+          }
+          if (existingTokens.user_id) {
+            additionalData.user_id = existingTokens.user_id;
+          }
+          if (existingTokens.id_token) {
+            additionalData.id_token = existingTokens.id_token;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to preserve existing token data:', error);
+      }
+      
+      // Add new token information if available
+      if (tokens.user_info) {
+        additionalData.user_info = tokens.user_info;
+      }
+      if (tokens.user_id) {
+        additionalData.user_id = tokens.user_id;
+      }
+      if (tokens.id_token) {
+        additionalData.id_token = tokens.id_token;
+      }
+      
+      this.setAccessToken(tokens.access_token, additionalData);
       console.log('Access token refreshed successfully');
       return tokens;
     } catch (error) {
@@ -181,6 +277,24 @@ class AuthService {
    */
   async tryRefreshOnStartup() {
     try {
+      // If we already have a token loaded from localStorage, check if we need to refresh
+      if (this.accessToken) {
+        console.log('Access token found in localStorage, checking if refresh needed...');
+        
+        // Check if token was saved recently (within last 4 minutes)
+        const tokens = JSON.parse(localStorage.getItem('auth_tokens'));
+        const tokenAge = Date.now() - (tokens?.timestamp || 0);
+        const fourMinutes = 4 * 60 * 1000;
+        
+        if (tokenAge < fourMinutes) {
+          console.log('Token is recent, no refresh needed');
+          return true;
+        }
+        
+        console.log('Token is older than 4 minutes, attempting refresh...');
+      }
+      
+      // Try to refresh the token
       await this.refreshToken();
       return true;
     } catch (error) {

@@ -13,10 +13,17 @@ class ViewSessionService {
   }
 
   /**
-   * Get auth token from localStorage
-   * This should match your authentication implementation
+   * Get auth token from authService (preferred) or fallback to localStorage
+   * This ensures consistency with the main authentication system
    */
   getAuthToken() {
+    // First try to get token from authService
+    const token = authService.getAccessToken();
+    if (token) {
+      return token;
+    }
+    
+    // Fallback to localStorage for compatibility
     try {
       const tokens = JSON.parse(localStorage.getItem('auth_tokens'));
       return tokens?.access_token;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import uploadService from '../services/uploadService';
 
@@ -6,8 +6,37 @@ const DebugPage = () => {
   const { isAuthenticated, isLoading, error, getAccessToken, login, logout } = useAuth();
   const [apiTestResult, setApiTestResult] = useState(null);
   const [testLoading, setTestLoading] = useState(false);
+  const [localStorageToken, setLocalStorageToken] = useState(null);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const token = getAccessToken();
+
+  // Check localStorage token separately
+  useEffect(() => {
+    const checkLocalStorage = () => {
+      try {
+        const tokens = JSON.parse(localStorage.getItem('auth_tokens'));
+        setLocalStorageToken(tokens);
+      } catch (error) {
+        setLocalStorageToken(null);
+      }
+    };
+
+    checkLocalStorage();
+    
+    // Check localStorage every second to see changes
+    const interval = setInterval(checkLocalStorage, 1000);
+    return () => clearInterval(interval);
+  }, [refreshCount]);
+
+  const handleRefresh = () => {
+    setRefreshCount(prev => prev + 1);
+  };
+
+  const clearLocalStorage = () => {
+    localStorage.removeItem('auth_tokens');
+    handleRefresh();
+  };
 
   const testApiCall = async () => {
     setTestLoading(true);
@@ -80,10 +109,57 @@ const DebugPage = () => {
         <p><strong>Is Authenticated:</strong> {isAuthenticated ? '✅ Yes' : '❌ No'}</p>
         <p><strong>Is Loading:</strong> {isLoading ? '⏳ Loading...' : '✅ Ready'}</p>
         <p><strong>Error:</strong> {error || 'None'}</p>
-        <p><strong>Has Token:</strong> {token ? '✅ Yes' : '❌ No'}</p>
+        <p><strong>Has Token (AuthService):</strong> {token ? '✅ Yes' : '❌ No'}</p>
         {token && (
           <p><strong>Token Preview:</strong> {token.substring(0, 50)}...</p>
         )}
+      </div>
+
+      <div style={{ background: '#e8f5e8', padding: '15px', margin: '10px 0', borderRadius: '5px' }}>
+        <h2>localStorage Status</h2>
+        <p><strong>Has localStorage Token:</strong> {localStorageToken?.access_token ? '✅ Yes' : '❌ No'}</p>
+        {localStorageToken?.access_token && (
+          <>
+            <p><strong>localStorage Token Preview:</strong> {localStorageToken.access_token.substring(0, 50)}...</p>
+            <p><strong>Token Timestamp:</strong> {localStorageToken.timestamp ? new Date(localStorageToken.timestamp).toLocaleString() : 'Not set'}</p>
+            <p><strong>User Info:</strong> {localStorageToken.user_info ? '✅ Present' : '❌ Missing'}</p>
+            <p><strong>User ID:</strong> {localStorageToken.user_id || localStorageToken.user_info?.sub || 'Not set'}</p>
+          </>
+        )}
+        
+        <div style={{ marginTop: '10px' }}>
+          <button 
+            onClick={handleRefresh}
+            style={{ 
+              backgroundColor: '#28a745', 
+              color: 'white', 
+              border: 'none', 
+              padding: '5px 10px', 
+              margin: '2px',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Refresh Debug Info
+          </button>
+          
+          <button 
+            onClick={clearLocalStorage}
+            style={{ 
+              backgroundColor: '#dc3545', 
+              color: 'white', 
+              border: 'none', 
+              padding: '5px 10px', 
+              margin: '2px',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Clear localStorage
+          </button>
+        </div>
       </div>
 
       <div style={{ background: '#f0f8ff', padding: '15px', margin: '10px 0', borderRadius: '5px' }}>
