@@ -171,7 +171,6 @@ CLOUDFRONT_DOMAIN=xxxxxxx.cloudfront.net
 # Google OAuth2
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/oauth/callback
 
 # Database Configuration
 DB_USERNAME=app_user
@@ -299,9 +298,6 @@ RABBITMQ_EXCHANGE=video.exchange
 RABBITMQ_QUEUE_ENCODING=video.encoding.queue
 RABBITMQ_ROUTING_KEY_ENCODING=video.encoding
 
-# Multipart Upload Configuration
-MULTIPART_CLEANUP_ENABLED=true
-MULTIPART_CLEANUP_MAX_AGE_HOURS=24
 ```
 
 ### Streaming Service
