@@ -133,6 +133,12 @@ This is a separate, large-scale IAM project within the platform, acting as a cen
 
 ---
 
+## Login Page (Screenshot)
+
+<img width="1728" height="986" alt="image" src="https://github.com/user-attachments/assets/fc9dd80e-2755-4fa5-9b1f-48149a5bc919" />
+
+---
+
 ## Security Notes
 - BCrypt password hashing for local accounts
 - PKCE required for public clients
@@ -144,5 +150,3 @@ This is a separate, large-scale IAM project within the platform, acting as a cen
 ## References
 - RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), RFC 7519 (JWT)
 - OpenID Connect Core 1.0
-
-
