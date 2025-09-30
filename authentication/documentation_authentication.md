@@ -217,14 +217,10 @@ TokenSettings:
 - HTTPS enforcement disabled for local development only
 - Token refresh mechanism with secure cookie storage
 
-## 9. AI/ML Usage
-
-**Not Applicable** - This microservice does not implement AI/ML functionality. It focuses on authentication and authorization services.
-
-## 10. Deployment & Runtime
+## 9. Deployment & Runtime
 
 ### Containerization
-The service is designed for containerized deployment, though no explicit Dockerfile was found in the analyzed code. Typical containerization would include:
+The service is designed for containerized deployment. Typical containerization would include:
 
 ```dockerfile
 # Example Dockerfile structure
@@ -299,6 +295,6 @@ This documentation provides a comprehensive overview of the authentication micro
 
 ---
 
-*Document Version: 1.0*
+*Document Version: 1.1*
 *Platform Version: Video Hosting Platform v1.0*  
 *Authors: Platform Development Team* 
